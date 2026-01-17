@@ -1,8 +1,5 @@
 一个专为游戏策划师设计的现代化桌面应用，集灵感收集、文档管理、团队协作于一体，帮助游戏开发者更高效地组织创意、规划项目。
 
-https://img.shields.io/badge/版本-0.1.0_Alpha-blue
-https://img.shields.io/badge/技术栈-React%2FElectron%2FTailwind-brightgreen
-https://img.shields.io/badge/状态-积极开发中-orange
 
 ✨ 核心特性
 
