@@ -4,9 +4,10 @@ import { BrainstormBoard } from './components/Brainstorm/Board';
 import { TeamManager } from './components/Team/TeamManager';
 import { ProjectMeta, ProjectContent, loadProjectContent, saveProjectContent } from './utils/storage';
 import { Docs } from './components/Docs/Docs'; // 引入 Docs 组件
+import { UIManager } from './components/UIPrototype/UIManager';
 
 
-type ModuleType = 'brainstorm' | 'docs' | 'ui-designer' | 'team';
+type ModuleType = 'brainstorm' | 'docs' | 'ui-designer' | 'team' | 'ui';
 
 function App() {
   const [currentProject, setCurrentProject] = useState<ProjectMeta | null>(null);
@@ -95,6 +96,12 @@ function ProjectEditorLayout({ project, content, setContent, onBack, saveStatus 
     return { ...prev, docs: newDocs };
   });
 };
+const handleUpdateUI = (newUIData: any) => {
+  setContent((prev: any) => {
+    if (!prev) return null;
+    return { ...prev, ui: newUIData };
+  });
+};
 
 
   return (
@@ -108,7 +115,7 @@ function ProjectEditorLayout({ project, content, setContent, onBack, saveStatus 
           <SidebarBtn label="💡 灵感白板" isActive={activeModule === 'brainstorm'} onClick={() => setActiveModule('brainstorm')} />
           <SidebarBtn label="👥 团队管理" isActive={activeModule === 'team'} onClick={() => setActiveModule('team')} />
           <SidebarBtn label="📝 策划文档" isActive={activeModule === 'docs'} onClick={() => setActiveModule('docs')} />
-          <SidebarBtn label="🎨 UI 原型机" isActive={activeModule === 'ui-designer'} onClick={() => setActiveModule('ui-designer')} />
+          <SidebarBtn label="🎨 UI 原型机" isActive={activeModule === 'ui'} onClick={() => setActiveModule('ui')} />
         </nav>
         <div className="p-4 text-xs border-t border-slate-700 text-center">
            {saveStatus === 'saving' ? '💾 保存中...' : '✔ 已保存'}
@@ -139,7 +146,12 @@ function ProjectEditorLayout({ project, content, setContent, onBack, saveStatus 
           />
         )}
 
-        {activeModule === 'ui-designer' && <div className="flex items-center justify-center h-full text-slate-500">[ UI 模块 ]</div>}
+       {activeModule === 'ui' && (
+          <UIManager 
+            data={content.ui || { pages: [] }} // 确保不为空
+            onUpdate={handleUpdateUI}
+          />
+        )}
       </main>
     </>
   );
