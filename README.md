@@ -25,7 +25,7 @@
 · 前端框架: React 18 + TypeScript · 桌面框架: Electron 28 · 构建工具: Vite 5 · 样式方案: Tailwind CSS 3.4 · 交互库: React Draggable + React Xarrows · 数据持久化: LocalStorage (模拟数据库)
 
 项目结构
-
+```
 game-planner/
 ├── electron/                  # Electron 主进程代码
 │   └── main.js               # 窗口创建、系统事件处理、开发者工具控制
@@ -46,6 +46,7 @@ game-planner/
 │   └── main.tsx              # React 入口
 ├── package.json              # 依赖管理与脚本命令
 └── vite.config.ts            # Vite 配置 (已剥离 Electron 插件，纯 React 模式)
+```
 🚀 快速开始
 
 环境要求
@@ -55,16 +56,21 @@ game-planner/
 安装步骤
 
 # 克隆项目
+```
 git clone <repository-url>
-
+```
 # 进入项目目录
+```
 cd game-planner
-
+```
 # 安装依赖
+```
 npm install
-
+```
 # 启动开发服务器
+```
 npm run dev
+```
 
 
 # 打包桌面应用
