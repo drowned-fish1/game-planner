@@ -165,7 +165,7 @@ export function UICanvas({
         scale={1}
         globalVars={globalVars}
         onUpdate={isModal ? () => {} : updateComponent} 
-        onSelect={(e) => { 
+        onSelect={(_e) => { 
             if (isModal) return; 
             setSelectedId(comp.id); setContextMenu(null); 
         }}
