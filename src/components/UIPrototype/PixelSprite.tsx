@@ -34,7 +34,7 @@ export const PixelSprite: React.FC<PixelSpriteProps> = ({
     const img = new Image();
     // === 核心修改：优先使用 config 中的 imageUrl ===
     // 如果 config.imageUrl 存在（用户上传的），用它；否则用默认 assets 图
-    img.src = config.imageUrl || '/assets/ui-sprites.png';
+    img.src = config.imageUrl || './assets/ui-sprites.png';
     
     img.onload = () => {
       // 计算最终在画布上的尺寸
