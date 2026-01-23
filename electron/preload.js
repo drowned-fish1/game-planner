@@ -16,3 +16,17 @@ contextBridge.exposeInMainWorld('electron', {
     }
   }
 });
+// electron/preload.js
+const { contextBridge, ipcRenderer } = require('electron');
+
+// 将 ipcRenderer 的部分功能暴露给前端 window 对象
+contextBridge.exposeInMainWorld('electronAPI', {
+  // 允许前端发送消息
+  send: (channel, data) => ipcRenderer.send(channel, data),
+  // 允许前端接收消息
+  on: (channel, func) => {
+    const subscription = (event, ...args) => func(...args);
+    ipcRenderer.on(channel, subscription);
+    return () => ipcRenderer.removeListener(channel, subscription);
+  }
+});

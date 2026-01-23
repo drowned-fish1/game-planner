@@ -9,3 +9,33 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
+/* 磁贴调整大小手柄样式 */
+.react-resizable {
+  position: relative;
+}
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize; /* 鼠标变成斜向箭头 */
+  z-index: 100;
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s;
+}
+/* 只有当鼠标悬停在磁贴上时，才显示手柄，避免视觉杂乱 */
+.group:hover .react-resizable-handle {
+  opacity: 1;
+}
+/* 自定义手柄图标 (右下角的小三角) */
+.react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(255,255,255,0.5);
+  border-bottom: 2px solid rgba(255,255,255,0.5);
+}
