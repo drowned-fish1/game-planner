@@ -1,117 +1,105 @@
-一个专为游戏策划师设计的现代化桌面应用，集灵感收集、文档管理、团队协作于一体，帮助游戏开发者更高效地组织创意、规划项目。
+# 🎮 Game Planner Pro
 
-✨ 核心特性
+> 一款专为独立游戏开发者打造的一站式电子游戏策划工具。集成灵感白板、文档编辑器、像素风 UI 原型机以及强大的 AI 辅助功能。
 
-🧠 灵感白板（Brainstorm Board）
+![Version](https://img.shields.io/badge/version-0.2.0-blue) ![Electron](https://img.shields.io/badge/Electron-29.0-green) ![React](https://img.shields.io/badge/React-18.0-blue) ![License](https://img.shields.io/badge/license-MIT-orange)
 
-· 多格式贴纸：支持文字、图片、链接、代码片段等多种内容形式 · 自由布局：拖拽式无限画布，随心放置和组织灵感 · 智能连接：使用连线建立灵感之间的关联，构建思维网络 · 实时保存：自动保存所有更改，永不丢失创意
+## ✨ 核心功能 (Features)
 
-📚 智能文档系统
+### 💡 灵感白板 (Brainstorm Board)
+* **无限画布**：支持自由拖拽、缩放、平移。
+* **多媒体支持**：直接拖入图片、视频、音频文件。
+* **连线逻辑**：可视化连接各个节点，梳理游戏流程。
+* **AI 智能总结**：
+    * **单点总结**：右键磁贴，AI 自动提炼内容。
+    * **汇聚分析**：将多个磁贴连线指向 AI 节点，一键生成综合分析报告。
 
-· 专业模板库：内置游戏行业标准模板 · 🎮 GDD游戏策划案模板 · 🗺️ 关卡设计模板 · 👤 角色设定卡模板 · 📝 空白文档模板 · 结构化编辑：分章节、可折叠的文档编辑器 · 快速创建：一键生成完整文档结构
+### 📝 智能策划文档 (Smart Docs)
+* **树状结构**：无限层级的文档目录树。
+* **所见即所得**：基于 Tiptap 的富文本编辑体验。
+* **AI 写作助手**：选中文字即可呼出 AI 菜单，支持**润色**、**扩写**、**总结**、**翻译**。
+* **安全模式**：AI 生成内容需人工确认后才会写入文档，防止误操作。
 
-👥 团队协作
+### 🎨 UI 原型机 (Pixel UI Prototyper)
+* **像素风渲染**：专为像素游戏优化的 Canvas 渲染引擎，杜绝模糊。
+* **可视化交互**：无需代码，通过下拉菜单配置 `跳转`、`弹窗`、`变量修改` 等逻辑。
+* **资产切片**：内置资产编辑器，支持上传图片并自定义切片 (Slice)。
+* **实时预览**：在编辑器内直接运行和测试 UI 交互流。
 
-· 成员管理：添加/移除团队成员，分配角色 · 权限控制：基于角色的访问权限管理 · 实时待办：团队任务清单，协同工作流 · 项目共享：团队内项目共享与协作
+### ⚙️ 灵活的 AI 配置
+* **多源支持**：兼容 OpenAI 格式接口，支持 DeepSeek、Claude、ChatGPT 等。
+* **自定义配置**：在设置页管理多个 API Key 和 Base URL，随时切换。
 
-🎨 媒体支持
+---
 
-· 图片导入：支持拖拽上传图片到灵感贴纸 · 内容预览：链接自动生成预览卡片 · 富文本编辑：基本的文本格式化功能
+## 🛠️ 技术栈 (Tech Stack)
 
-🛠️ 技术架构
+* **Runtime**: Electron (开启 `nodeIntegration: false`, `contextIsolation: true`, `webSecurity: false`)
+* **Frontend**: React + TypeScript + Vite
+* **Styling**: Tailwind CSS
+* **State/Storage**: LocalStorage (纯本地存储，隐私安全)
+* **Key Libraries**:
+    * `react-xarrows`: 连线绘制
+    * `@tiptap/react`: 富文本编辑
+    * `react-draggable` / `react-resizable`: 拖拽与缩放交互
+    * `html-to-image`: 画布截图导出
 
-技术栈
+---
 
-· 前端框架: React 18 + TypeScript · 桌面框架: Electron 28 · 构建工具: Vite 5 · 样式方案: Tailwind CSS 3.4 · 交互库: React Draggable + React Xarrows · 数据持久化: LocalStorage (模拟数据库)
+## 🚀 快速开始 (Getting Started)
 
-项目结构
+### 环境要求
+* Node.js >= 16.0.0
+* npm 或 yarn
 
-game-planner/
-├── electron/                  # Electron 主进程代码
-│   └── main.js               # 窗口创建、系统事件处理、开发者工具控制
-├── src/                       # React 渲染进程代码 (UI 层)
-│   ├── components/
-│   │   ├── Brainstorm/        # [灵感白板] 模块
-│   │   │   ├── Board.tsx     # 画布逻辑、缩放、截图、右键菜单
-│   │   │   └── NoteCard.tsx  # 多媒体磁贴 (视频/代码/图片/状态) 的封装
-│   │   ├── Dashboard/         # [仪表盘] 首页，概览数据
-│   │   ├── Docs/              # [策划文档] Tiptap 编辑器集成
-│   │   ├── Team/              # [团队管理] 成员列表与任务分配
-│   │   └── UIPrototype/       # [UI 原型机] (正在开发中)
-│   │       ├── UIManager.tsx # 页面流管理 (新增/删除/预览入口)
-│   │       └── UICanvas.tsx  # 页面编辑器 (拖拽资产、属性配置)
-│   ├── utils/
-│   │   └── storage.ts        # 数据持久化层 (LocalStorage 读写 + 类型定义)
-│   ├── App.tsx               # 全局路由、侧边栏导航、模块切换逻辑
-│   └── main.tsx              # React 入口
-├── package.json              # 依赖管理与脚本命令
-└── vite.config.ts            # Vite 配置 (已剥离 Electron 插件，纯 React 模式)
-🚀 快速开始
+### 安装步骤
 
-环境要求
+1.  **克隆项目**
+    ```bash
+    git clone [https://github.com/yourusername/game-planner.git](https://github.com/yourusername/game-planner.git)
+    cd game-planner
+    ```
 
-· Node.js 18+ · npm 9+
+2.  **安装依赖**
+    > ⚠️ 注意：由于依赖版本敏感，建议使用 npm 并严格按照 package.json 安装
+    ```bash
+    npm install
+    ```
 
-安装步骤
+3.  **启动开发模式**
+    ```bash
+    npm run dev
+    ```
 
-# 克隆项目
-git clone <repository-url>
+4.  **打包构建 (Windows/Mac/Linux)**
+    ```bash
+    npm run electron:build
+    ```
 
-# 进入项目目录
-cd game-planner
+---
 
-# 安装依赖
-npm install
+## 📖 使用指南 (Usage)
 
-# 启动开发服务器
-npm run dev
+1.  **配置 AI**: 首次进入，请点击侧边栏底部的 **"设置"**，添加你的 API Key 和 Base URL (如 DeepSeek 或 OpenAI)。
+2.  **创建项目**: 在仪表盘点击 "+" 号创建新项目。
+3.  **开始策划**:
+    * 切换到 **白板** 整理思路。
+    * 切换到 **文档** 撰写 GDD。
+    * 切换到 **UI 原型** 搭建游戏界面。
 
+---
 
-# 打包桌面应用
-npm run electron:build
-📋 功能路线图
+---
 
-✅ 已实现
+## 🤝 贡献 (Contributing)
 
-· 灵感白板系统（拖拽+连线） · 项目大厅与文档管理 · 专业游戏文档模板 · 多媒体内容支持 · 团队管理与待办事项 · 本地数据持久化
+欢迎提交 Issue 和 Pull Request！
 
-🔄 开发中
+1.  Fork 本仓库
+2.  新建 Feat_xxx 分支
+3.  提交代码
+4.  新建 Pull Request
 
-· UI原型机功能 · 游戏界面组件库 · 可交互UI原型 · 布局与样式工具
+---
 
-📅 计划中
-
-· 实时联机协作 · 多人实时编辑 · 变更同步与冲突解决 · 在线演示模式 · 高级功能 · 版本历史与差异对比 · 导出与分享功能 · 插件系统  · 游戏引擎导出
-
-🎯 使用场景
-
-独立开发者
-
-· 整理游戏设计灵感 · 结构化编写策划文档 · 管理个人项目进度
-
-小型团队
-
-· 共享创意白板 · 协同编写游戏策划案 · 分配团队任务与跟踪进度
-
-教育场景
-
-· 游戏设计教学工具 · 学生项目协作平台 · 作品集整理与管理
-
-🤝 贡献指南
-
-我们欢迎所有形式的贡献！请参考以下步骤：
-
-Fork 本仓库
-创建功能分支 (git checkout -b feature/AmazingFeature)
-提交更改 (git commit -m 'Add some AmazingFeature')
-推送到分支 (git push origin feature/AmazingFeature)
-开启一个 Pull Request
-开发规范
-
-· 使用TypeScript编写所有代码 · 遵循现有的代码风格 · 添加适当的注释和文档 · 确保代码通过ESLint检查
-
-🙏 致谢
-
-感谢所有贡献者和用户的支持！特别感谢以下开源项目：
-
-· React - UI框架 · Electron - 桌面应用框架 · Tailwind CSS - 样式框架 · 以及所有依赖库的维护者们
+**License** [MIT](LICENSE) © 2026 Game Planner Team

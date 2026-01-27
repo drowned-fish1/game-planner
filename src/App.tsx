@@ -1,13 +1,16 @@
+// src/App.tsx
 import { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { BrainstormBoard } from './components/Brainstorm/Board';
 import { TeamManager } from './components/Team/TeamManager';
 import { ProjectMeta, ProjectContent, loadProjectContent, saveProjectContent } from './utils/storage';
-import { Docs } from './components/Docs/Docs'; // 引入 Docs 组件
+import { Docs } from './components/Docs/Docs';
 import { UIManager } from './components/UIPrototype/UIManager';
+import { Settings } from './components/Settings/Settings'; // 引入 Settings 组件
+import { Settings as SettingsIcon } from 'lucide-react'; // 引入 Settings 图标
 
-
-type ModuleType = 'brainstorm' | 'docs' | 'ui-designer' | 'team' | 'ui';
+// 定义模块类型，包含新增的 'settings'
+type ModuleType = 'brainstorm' | 'docs' | 'ui-designer' | 'team' | 'ui' | 'settings';
 
 function App() {
   const [currentProject, setCurrentProject] = useState<ProjectMeta | null>(null);
@@ -25,6 +28,7 @@ function App() {
     setProjectContent(null);
   };
 
+  // 自动保存逻辑
   useEffect(() => {
     if (!currentProject || !projectContent) return;
     setSaveStatus('unsaved');
@@ -36,6 +40,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [projectContent]);
 
+  // Ctrl+S 快捷键保存
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -70,6 +75,7 @@ function App() {
 function ProjectEditorLayout({ project, content, setContent, onBack, saveStatus }: any) {
   const [activeModule, setActiveModule] = useState<ModuleType>('brainstorm');
 
+  // 数据更新处理函数
   const handleBrainstormChange = (newItems: any[], newConnections: any[]) => {
     setContent((prev: any) => {
       if (!prev) return null;
@@ -90,19 +96,20 @@ function ProjectEditorLayout({ project, content, setContent, onBack, saveStatus 
       return { ...prev, todos: newTodos };
     });
   };
-  const handleUpdateDocs = (newDocs: any[]) => {
-  setContent((prev: any) => {
-    if (!prev) return null;
-    return { ...prev, docs: newDocs };
-  });
-};
-const handleUpdateUI = (newUIData: any) => {
-  setContent((prev: any) => {
-    if (!prev) return null;
-    return { ...prev, ui: newUIData };
-  });
-};
 
+  const handleUpdateDocs = (newDocs: any[]) => {
+    setContent((prev: any) => {
+      if (!prev) return null;
+      return { ...prev, docs: newDocs };
+    });
+  };
+
+  const handleUpdateUI = (newUIData: any) => {
+    setContent((prev: any) => {
+      if (!prev) return null;
+      return { ...prev, ui: newUIData };
+    });
+  };
 
   return (
     <>
@@ -111,12 +118,25 @@ const handleUpdateUI = (newUIData: any) => {
           <button onClick={onBack} className="p-2 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors">←</button>
           <div className="font-bold text-white truncate flex-1">{project.name}</div>
         </div>
+        
         <nav className="flex-1 p-4 space-y-2">
           <SidebarBtn label="💡 灵感白板" isActive={activeModule === 'brainstorm'} onClick={() => setActiveModule('brainstorm')} />
           <SidebarBtn label="👥 团队管理" isActive={activeModule === 'team'} onClick={() => setActiveModule('team')} />
           <SidebarBtn label="📝 策划文档" isActive={activeModule === 'docs'} onClick={() => setActiveModule('docs')} />
           <SidebarBtn label="🎨 UI 原型机" isActive={activeModule === 'ui'} onClick={() => setActiveModule('ui')} />
+          
+          {/* 分隔线 */}
+          <div className="h-px bg-slate-700 my-2"></div>
+          
+          {/* 设置按钮 */}
+          <button 
+             onClick={() => setActiveModule('settings')}
+             className={`w-full text-left px-4 py-3 rounded-md transition-all flex items-center gap-2 ${activeModule === 'settings' ? 'bg-emerald-600 text-white shadow-md' : 'hover:bg-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+             <SettingsIcon size={16} /> 设 置
+          </button>
         </nav>
+
         <div className="p-4 text-xs border-t border-slate-700 text-center">
            {saveStatus === 'saving' ? '💾 保存中...' : '✔ 已保存'}
         </div>
@@ -145,12 +165,15 @@ const handleUpdateUI = (newUIData: any) => {
             onUpdate={handleUpdateDocs}
           />
         )}
-
-       {activeModule === 'ui' && (
+        {activeModule === 'ui' && (
           <UIManager 
-            data={content.ui || { pages: [] }} // 确保不为空
+            data={content.ui || { pages: [] }} 
             onUpdate={handleUpdateUI}
           />
+        )}
+        {/* 设置模块渲染 */}
+        {activeModule === 'settings' && (
+            <Settings />
         )}
       </main>
     </>

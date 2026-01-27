@@ -1,11 +1,14 @@
 // src/components/Brainstorm/NoteCard.tsx
 import { useState, useRef } from 'react';
 import Draggable from 'react-draggable';
-import { Resizable } from 'react-resizable'; // 引入 Resizable
+import { Resizable } from 'react-resizable';
 import { Sparkles, Loader2, Bot } from 'lucide-react';
+// 确保这个路径下有你的 Settings 定义，如果没有，请在下方手动定义 interface AIConfig
+import { AIConfig } from '../Settings/Settings'; 
 
-const API_KEY = "sk-c0a5kdmepvv4mrfnrsvhsj8k1vaqzclefhz12kgizynzxy4c"; 
-const API_URL = "https://api.xiaomimimo.com/v1/chat/completions"; 
+// 定义存储键名
+const STORAGE_KEY_CONFIGS = 'gp_ai_configs';
+const STORAGE_KEY_ACTIVE = 'gp_ai_active_id';
 
 interface NoteCardProps {
   id: string;
@@ -13,13 +16,13 @@ interface NoteCardProps {
   content: string; 
   x: number;
   y: number;
-  width?: number;  // 新增
-  height?: number; // 新增
+  width?: number;
+  height?: number;
   scale: number;
   isSelected?: boolean;
   inputs?: string[]; 
   onUpdate: (id: string, content: string) => void;
-  onResize?: (id: string, width: number, height: number) => void; // 新增
+  onResize?: (id: string, width: number, height: number) => void;
   onDelete: (id: string) => void;
   onDrag: (id: string, x: number, y: number) => void;
   onConnectStart?: (id: string) => void;
@@ -44,7 +47,7 @@ export function NoteCard({
   const [isEditingUrl, setIsEditingUrl] = useState(!content);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 设置默认尺寸（如果父组件没传）
+  // 设置默认尺寸
   const currentW = width || 250;
   const currentH = height || (type === 'status' ? 50 : 160);
 
@@ -58,23 +61,75 @@ export function NoteCard({
     onUpdate(id, keys[nextIndex]);
   };
 
+  // === AI 核心逻辑 (动态配置版) ===
   const handleAISummarize = async (mode: 'self' | 'inputs') => {
-    if (!API_KEY.startsWith("sk-")) { alert("请配置 Key"); return; }
+    // 1. 从 localStorage 读取配置
+    const savedConfigs = localStorage.getItem(STORAGE_KEY_CONFIGS);
+    const activeId = localStorage.getItem(STORAGE_KEY_ACTIVE);
+    
+    if (!savedConfigs) {
+        alert("请先在左侧【设置】中配置 AI API");
+        return;
+    }
+
+    const configs: AIConfig[] = JSON.parse(savedConfigs);
+    const config = configs.find(c => c.id === activeId) || configs[0];
+
+    if (!config || !config.key || !config.url) {
+        alert("当前的 AI 配置无效或缺少 Key，请检查设置。");
+        return;
+    }
+
     setIsLoading(true);
-    let prompt = mode === 'self' ? `请总结以下内容：\n${content}` : `请将以下 ${inputs.length} 条内容进行汇总、分析并总结出核心观点：\n` + inputs.map((t, i) => `${i+1}. ${t}`).join('\n');
+
+    let prompt = "";
+    if (mode === 'self') {
+        prompt = `请总结以下内容：\n${content}`;
+    } else {
+        if (inputs.length === 0) {
+            alert("没有其他磁贴指向我，无法进行汇总总结。");
+            setIsLoading(false);
+            return;
+        }
+        prompt = `请将以下 ${inputs.length} 条内容进行汇总、分析并总结出核心观点：\n` + inputs.map((t, i) => `${i+1}. ${t}`).join('\n');
+    }
+
     try {
-        const res = await fetch(API_URL, {
+        // 2. 使用配置中的 URL 和 Key
+        const res = await fetch(config.url, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${API_KEY}` },
-            body: JSON.stringify({ model: "mimo-v2-flash", messages: [{ role: "system", content: "你是一个高效的助手。" }, { role: "user", content: prompt }] })
+            headers: {
+                "Content-Type": "application/json",
+                // 兼容 Bearer 验证方式
+                "Authorization": `Bearer ${config.key}`
+            },
+            body: JSON.stringify({
+                model: config.model, // 使用配置中的模型名
+                messages: [
+                    { role: "system", content: "你是一个高效的助手，擅长总结和提炼信息。请直接输出总结结果，不要废话。" },
+                    { role: "user", content: prompt }
+                ],
+                stream: false
+            })
         });
+        
         const data = await res.json();
         if (data.choices && data.choices[0]) {
             const result = data.choices[0].message.content;
-            if (mode === 'inputs') onUpdate(id, (content ? content + "\n\n---\n\n" : "") + "🤖 **AI 汇总**:\n" + result);
-            else onUpdate(id, result);
-        } else { alert("AI Error: " + JSON.stringify(data)); }
-    } catch (e) { console.error(e); alert("Failed"); } finally { setIsLoading(false); }
+            if (mode === 'inputs') {
+                onUpdate(id, (content ? content + "\n\n---\n\n" : "") + `🤖 **AI 汇总 (${config.model})**:\n` + result);
+            } else {
+                onUpdate(id, result);
+            }
+        } else {
+            alert("AI 响应异常: " + JSON.stringify(data));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("请求失败，请检查设置中的 URL 和 Key 是否正确，以及网络连接。");
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const renderContent = () => {
@@ -89,8 +144,8 @@ export function NoteCard({
                     {isLoading && <Loader2 size={12} className="animate-spin text-purple-400"/>}
                 </div>
                 <textarea className="flex-1 bg-transparent resize-none outline-none text-slate-200 text-xs p-3 custom-scrollbar placeholder-purple-300/20"
-                    placeholder="输入或连接..." value={content} onChange={(e) => onUpdate(id, e.target.value)}
-                    onContextMenu={(e) => { e.preventDefault(); if (confirm("AI 总结?")) handleAISummarize('self'); }}
+                    placeholder="输入或连接其他磁贴..." value={content} onChange={(e) => onUpdate(id, e.target.value)}
+                    onContextMenu={(e) => { e.preventDefault(); if (confirm("AI 总结当前内容?")) handleAISummarize('self'); }}
                 />
                 {inputs.length > 0 && <button onClick={() => handleAISummarize('inputs')} disabled={isLoading} className="h-7 bg-purple-600 hover:bg-purple-500 text-white text-[10px] flex items-center justify-center gap-2"><Sparkles size={12} /> 汇总 {inputs.length} 来源</button>}
             </div>
@@ -177,7 +232,7 @@ export function NoteCard({
             </div>
          </Resizable>
 
-         {/* 连线锚点 (保持不变) */}
+         {/* 连线锚点 */}
          <div className={`${handleStyle} -top-1.5 left-1/2 -translate-x-1/2`} onMouseDown={(e) => { e.stopPropagation(); onConnectStart && onConnectStart(id); }} onMouseUp={(e) => { e.stopPropagation(); onConnectEnd && onConnectEnd(id); }} />
          <div className={`${handleStyle} -bottom-1.5 left-1/2 -translate-x-1/2`} onMouseDown={(e) => { e.stopPropagation(); onConnectStart && onConnectStart(id); }} onMouseUp={(e) => { e.stopPropagation(); onConnectEnd && onConnectEnd(id); }} />
          <div className={`${handleStyle} top-1/2 -left-1.5 -translate-y-1/2`} onMouseDown={(e) => { e.stopPropagation(); onConnectStart && onConnectStart(id); }} onMouseUp={(e) => { e.stopPropagation(); onConnectEnd && onConnectEnd(id); }} />
