@@ -4,7 +4,7 @@ import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu'; 
-import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, Hash, Download, FilePlus, Sparkles, Wand2, RefreshCcw, Languages, Expand } from 'lucide-react';
+import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, Hash, Download, FilePlus, Sparkles, Wand2, RefreshCcw, Languages, Expand, Menu, X } from 'lucide-react';
 import { DocItem } from '../../utils/storage';
 import { AIDialog, AIMode } from './AIDialog';
 
@@ -46,6 +46,9 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
   const editorRef = useRef<any>(null);
 
+  // 移动端侧边栏状态
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // 模板弹窗状态
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [targetParentId, setTargetParentId] = useState<string | null>(null);
@@ -81,6 +84,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
   const handleCreateClick = (parentId: string | null) => {
     setTargetParentId(parentId);
     setIsTemplateModalOpen(true);
+    // 移动端点击创建后，暂时保持菜单打开，或者根据需求关闭
   };
 
   const createDocFromTemplate = (templateId: string, parentId: string | null) => {
@@ -98,6 +102,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
     onUpdate(newDocs);
     setActiveDocId(newDoc.id);
     setIsTemplateModalOpen(false);
+    setIsMobileMenuOpen(false); // 创建后自动关闭移动端菜单，进入编辑
   };
 
   const deleteDoc = (e: React.MouseEvent, id: string) => {
@@ -154,6 +159,10 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
       const domPos = editor.view.domAtPos(pos + 1);
       if (domPos.node instanceof HTMLElement) domPos.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+    // 移动端点击大纲后自动关闭菜单
+    if (window.innerWidth < 768) {
+        setIsMobileMenuOpen(false);
+    }
   };
 
   const handleAIInsert = (text: string, mode: 'replace' | 'insert') => {
@@ -171,10 +180,16 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
     setAiMode(null);
   };
 
-  // 恢复 AI 写作按钮的触发函数
   const openAIGenerator = () => {
     setAiSelectedText('');
     setAiMode('generate');
+  };
+
+  // 选中文档逻辑
+  const handleSelectDoc = (id: string) => {
+      setActiveDocId(id);
+      // 移动端选中后自动关闭菜单，让用户开始编辑
+      setIsMobileMenuOpen(false);
   };
 
   const renderTree = (parentId: string | null, depth = 0) => {
@@ -188,18 +203,18 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
       return (
         <div key={doc.id}>
           <div 
-            className={`flex items-center gap-2 py-1 px-2 rounded cursor-pointer group select-none ${isActive ? 'bg-emerald-600/20 text-emerald-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            className={`flex items-center gap-2 py-3 md:py-1 px-2 rounded cursor-pointer group select-none transition-colors ${isActive ? 'bg-emerald-600/20 text-emerald-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
-            onClick={() => setActiveDocId(doc.id)}
+            onClick={() => handleSelectDoc(doc.id)}
           >
-            <span className={`p-0.5 rounded hover:bg-slate-700/50 ${hasChildren ? 'opacity-100' : 'opacity-0'}`} onClick={(e) => hasChildren && toggleExpand(e, doc.id)}>
+            <span className={`p-1 rounded hover:bg-slate-700/50 ${hasChildren ? 'opacity-100' : 'opacity-0'}`} onClick={(e) => { e.stopPropagation(); hasChildren && toggleExpand(e, doc.id); }}>
               {doc.expanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
             </span>
             {hasChildren ? <Folder size={16} className="text-yellow-500/80"/> : <FileText size={16} className="text-blue-400/80"/>}
             <span className="flex-1 truncate text-sm">{doc.title}</span>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-              <button onClick={(e) => { e.stopPropagation(); handleCreateClick(doc.id); }} className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"><Plus size={12} /></button>
-              <button onClick={(e) => deleteDoc(e, doc.id)} className="p-1 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400"><Trash2 size={12} /></button>
+            <div className="flex gap-2 md:gap-1 md:opacity-0 group-hover:opacity-100">
+              <button onClick={(e) => { e.stopPropagation(); handleCreateClick(doc.id); }} className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"><Plus size={16} md-size={12} /></button>
+              <button onClick={(e) => deleteDoc(e, doc.id)} className="p-1 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400"><Trash2 size={16} md-size={12} /></button>
             </div>
           </div>
 
@@ -209,7 +224,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
                    <div 
                      key={idx}
                      onClick={(e) => { e.stopPropagation(); scrollToHeading(h.pos); }}
-                     className="flex items-center gap-2 py-1 pr-2 rounded cursor-pointer hover:bg-slate-800 text-slate-500 hover:text-emerald-300 text-xs transition-colors"
+                     className="flex items-center gap-2 py-2 md:py-1 pr-2 rounded cursor-pointer hover:bg-slate-800 text-slate-500 hover:text-emerald-300 text-xs transition-colors"
                      style={{ paddingLeft: `${depth * 12 + 24 + (h.level - 1) * 8}px` }}
                    >
                      <Hash size={10} className="opacity-50 shrink-0" />
@@ -229,48 +244,74 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
 
   return (
     <div className="flex h-full w-full bg-slate-900 overflow-hidden relative">
-      {/* 左侧目录 */}
-      <div className="w-64 bg-slate-800/50 border-r border-slate-700 flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+      
+      {/* === 移动端侧边栏遮罩 === */}
+      {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+      )}
+
+      {/* === 左侧目录 (响应式：移动端为抽屉，桌面端固定) === */}
+      <div className={`
+          fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-700 flex flex-col shrink-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+          md:relative md:translate-x-0
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center h-14 md:h-auto">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Documents</span>
-          <button onClick={() => handleCreateClick(null)} className="p-1 hover:bg-emerald-600/20 rounded text-slate-400 hover:text-emerald-400"><Plus size={16} /></button>
+          <div className="flex gap-2">
+              <button onClick={() => handleCreateClick(null)} className="p-1 hover:bg-emerald-600/20 rounded text-slate-400 hover:text-emerald-400"><Plus size={18} /></button>
+              {/* 移动端关闭按钮 */}
+              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-1 text-slate-400"><X size={18}/></button>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin pb-20 md:pb-2">
             {renderTree(null)}
         </div>
       </div>
 
-      {/* 右侧编辑器 */}
-      <div className="flex-1 flex flex-col bg-slate-900 min-w-0">
+      {/* === 右侧编辑器 === */}
+      <div className="flex-1 flex flex-col bg-slate-900 min-w-0 w-full transition-all">
         {activeDoc ? (
           <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full relative">
-            <div className="flex items-center justify-between px-8 pt-8 pb-4 mx-8 border-b border-slate-800">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 md:px-8 pt-4 md:pt-8 pb-4 mx-0 md:mx-8 border-b border-slate-800 gap-2">
+              {/* 移动端汉堡菜单按钮 */}
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)} 
+                className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white"
+              >
+                <Menu size={20} />
+              </button>
+
               <input 
                 value={activeDoc.title}
                 onChange={(e) => updateDocTitle(activeDoc.id, e.target.value)}
-                className="bg-transparent text-4xl font-bold text-white outline-none flex-1 mr-4 placeholder-slate-700"
+                className="bg-transparent text-xl md:text-4xl font-bold text-white outline-none flex-1 min-w-0 placeholder-slate-700 truncate"
                 placeholder="无标题"
               />
-              <div className="flex gap-2">
-                {/* 恢复：AI 写作按钮，与导出按钮并排 */}
+              <div className="flex gap-2 shrink-0">
                 <button 
                   onClick={openAIGenerator}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors text-sm font-bold shadow-lg shadow-purple-900/20"
+                  className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors text-xs md:text-sm font-bold shadow-lg shadow-purple-900/20"
                 >
-                  <Sparkles size={16} /> <span>AI 写作</span>
+                  <Sparkles size={14} /> <span className="hidden md:inline">AI 写作</span><span className="md:hidden">AI</span>
                 </button>
 
                 <button 
                     onClick={exportDoc}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-400 rounded transition-colors text-sm font-medium"
+                    className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-400 rounded transition-colors text-xs md:text-sm font-medium"
                 >
-                    <Download size={16} />
-                    <span>导出</span>
+                    <Download size={14} />
+                    <span className="hidden md:inline">导出</span>
                 </button>
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto px-16 py-8">
+            {/* Editor Content */}
+            <div className="flex-1 overflow-y-auto px-4 md:px-16 py-4 md:py-8">
               <TiptapEditor 
                 docId={activeDoc.id}
                 initialContent={activeDoc.content}
@@ -287,18 +328,24 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-600">
              <div className="text-center">
-                <FilePlus size={48} className="mx-auto mb-4 opacity-20" />
-                <p>选择一个文档，或者点击左侧 + 号创建</p>
+                 {/* 移动端空状态提示点击左上角 */}
+                <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden mb-4 p-4 bg-slate-800 rounded-full animate-pulse">
+                    <Folder size={32} className="text-emerald-500" />
+                </button>
+                <FilePlus size={48} className="mx-auto mb-4 opacity-20 hidden md:block" />
+                <p className="hidden md:block">选择一个文档，或者点击左侧 + 号创建</p>
+                <p className="md:hidden text-sm">点击左上角图标打开文档列表</p>
              </div>
           </div>
         )}
       </div>
 
+      {/* === 模板选择弹窗 (适配宽度) === */}
       {isTemplateModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={() => setIsTemplateModalOpen(false)}>
-           <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl w-[500px]" onClick={e=>e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center backdrop-blur-sm px-4" onClick={() => setIsTemplateModalOpen(false)}>
+           <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl w-full max-w-[500px]" onClick={e=>e.stopPropagation()}>
               <h3 className="text-white mb-4">选择模板</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {TEMPLATES.map(t=>(<div key={t.id} onClick={()=>createDocFromTemplate(t.id, targetParentId)} className="p-4 bg-slate-700 hover:bg-emerald-600 cursor-pointer rounded text-white">{t.name}</div>))}
               </div>
               <button onClick={() => setIsTemplateModalOpen(false)} className="mt-6 w-full py-2 text-slate-500 hover:text-slate-300 text-sm">取消</button>
@@ -318,7 +365,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
   );
 }
 
-// === Editor 组件 ===
+// === Editor 组件 (逻辑保持不变，CSS已在外部容器控制) ===
 function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIRequest, onHeadingsUpdate }: any) {
   const onChangeRef = useRef(onChange);
   const prevHeadingsRef = useRef<string>(""); 
@@ -339,7 +386,6 @@ function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIReque
       }
     });
     
-    // 防抖：比较字符串，防止无限渲染
     const headingsStr = JSON.stringify(headings.map(h => h.id + h.text));
     if (headingsStr !== prevHeadingsRef.current) {
         prevHeadingsRef.current = headingsStr;
@@ -368,7 +414,7 @@ function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIReque
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-invert prose-lg max-w-none focus:outline-none min-h-[500px]',
+        class: 'prose prose-invert prose-lg max-w-none focus:outline-none min-h-[500px] text-base md:text-lg',
       },
     },
   }, []);
@@ -378,7 +424,6 @@ function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIReque
   useEffect(() => {
     if (editor && docId !== previousDocIdRef.current) {
        editor.commands.setContent(initialContent || '');
-       // 彻底移除了 clearHistory 调用，解决报错
        previousDocIdRef.current = docId;
        setTimeout(() => extractHeadings(editor), 50); 
     }
@@ -388,7 +433,7 @@ function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIReque
 
   return (
     <>
-      <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="flex gap-1 bg-slate-800 border border-slate-600 p-1 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+      <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="flex gap-1 bg-slate-800 border border-slate-600 p-1 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 flex-wrap max-w-[90vw]">
           <button onClick={() => onAIRequest('rewrite', editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to))} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-200 hover:bg-purple-600 hover:text-white rounded transition-colors"><Wand2 size={12} /> 润色</button>
           <button onClick={() => onAIRequest('expand', editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to))} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-200 hover:bg-emerald-600 hover:text-white rounded transition-colors"><Expand size={12} /> 扩写</button>
           <button onClick={() => onAIRequest('summarize', editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to))} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-200 hover:bg-blue-600 hover:text-white rounded transition-colors"><RefreshCcw size={12} /> 总结</button>
