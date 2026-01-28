@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { TeamMember, TodoItem } from '../../utils/storage';
 import { TodoList } from './TodoList';
+import { Users, CheckSquare } from 'lucide-react';
 
 interface TeamManagerProps {
   members: TeamMember[];
@@ -13,35 +14,33 @@ interface TeamManagerProps {
 export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: TeamManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // 右键菜单状态
+  // 移动端 Tab 状态: 'members' | 'todos'
+  const [activeTab, setActiveTab] = useState<'members' | 'todos'>('members');
+
   const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, memberId: string }>({ 
     visible: false, x: 0, y: 0, memberId: '' 
   });
 
-  // === 统一的编辑弹窗状态 ===
   const [modal, setModal] = useState<{ 
     isOpen: boolean; 
-    type: 'add' | 'rename' | 'role'; // 弹窗类型：添加 | 改名 | 改职位
+    type: 'add' | 'rename' | 'role'; 
     inputValue: string; 
     targetId?: string; 
   }>({ 
     isOpen: false, type: 'add', inputValue: '' 
   });
 
-  // 点击任意处关闭右键菜单
   useEffect(() => {
     const closeMenu = () => setContextMenu(prev => ({ ...prev, visible: false }));
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
-  // === 提交逻辑 (新增 或 修改) ===
   const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!modal.inputValue.trim()) return;
 
     if (modal.type === 'add') {
-      // 添加新成员
       const colors = ['bg-red-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-yellow-500', 'bg-orange-500', 'bg-pink-500'];
       const newMember: TeamMember = {
         id: uuidv4(),
@@ -51,26 +50,20 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
       };
       onUpdateMembers([...members, newMember]);
     } else if (modal.type === 'rename' && modal.targetId) {
-      // 修改名字
       onUpdateMembers(members.map(m => m.id === modal.targetId ? { ...m, name: modal.inputValue.trim() } : m));
     } else if (modal.type === 'role' && modal.targetId) {
-      // 修改职位
       onUpdateMembers(members.map(m => m.id === modal.targetId ? { ...m, role: modal.inputValue.trim() } : m));
     }
-
-    setModal({ ...modal, isOpen: false }); // 关闭弹窗
+    setModal({ ...modal, isOpen: false });
   };
 
-  // === 打开弹窗的辅助函数 ===
-  const openAddModal = () => {
-    setModal({ isOpen: true, type: 'add', inputValue: '' });
-  };
-
+  const openAddModal = () => setModal({ isOpen: true, type: 'add', inputValue: '' });
+  
   const openRenameModal = () => {
     const member = members.find(m => m.id === contextMenu.memberId);
     if (member) {
       setModal({ isOpen: true, type: 'rename', inputValue: member.name, targetId: member.id });
-      setContextMenu(prev => ({ ...prev, visible: false })); // 关闭菜单
+      setContextMenu(prev => ({ ...prev, visible: false }));
     }
   };
 
@@ -82,7 +75,6 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
     }
   };
 
-  // 右键菜单触发
   const handleContextMenu = (e: React.MouseEvent, memberId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -91,7 +83,6 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
     setContextMenu({ visible: true, x, y, memberId });
   };
 
-  // 头像上传
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && contextMenu.memberId) {
@@ -105,7 +96,6 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
     e.target.value = '';
   };
 
-  // 删除成员
   const handleDelete = () => {
     if (confirm("确定要移除这位成员吗？")) {
       onUpdateMembers(members.filter(m => m.id !== contextMenu.memberId));
@@ -114,37 +104,53 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
   };
 
   return (
-    <div className="flex h-full w-full bg-slate-900 overflow-hidden relative">
+    <div className="flex flex-col md:flex-row h-full w-full bg-slate-900 overflow-hidden relative">
       <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} className="hidden" accept="image/*" />
 
-      {/* 左/中：成员列表 */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="p-8 pb-4 border-b border-slate-800 flex justify-between items-center shrink-0">
+      {/* === 移动端 Tab 切换 === */}
+      <div className="md:hidden flex shrink-0 border-b border-slate-700 bg-slate-800">
+        <button 
+          onClick={() => setActiveTab('members')}
+          className={`flex-1 py-3 flex items-center justify-center gap-2 text-sm font-bold transition-colors ${activeTab === 'members' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-400'}`}
+        >
+          <Users size={16} /> 成员列表
+        </button>
+        <button 
+          onClick={() => setActiveTab('todos')}
+          className={`flex-1 py-3 flex items-center justify-center gap-2 text-sm font-bold transition-colors ${activeTab === 'todos' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-400'}`}
+        >
+          <CheckSquare size={16} /> 任务板
+        </button>
+      </div>
+
+      {/* 左/中：成员列表 (移动端受 Tab 控制，PC 端常驻) */}
+      <div className={`flex-1 flex-col min-w-0 ${activeTab === 'members' ? 'flex' : 'hidden md:flex'}`}>
+        <div className="p-4 md:p-8 pb-4 border-b border-slate-800 flex justify-between items-center shrink-0">
           <div>
-            <h2 className="text-3xl font-bold text-white">👥 团队管理</h2>
-            <p className="text-slate-400 text-sm mt-1">管理你的梦之队</p>
+            <h2 className="text-xl md:text-3xl font-bold text-white">👥 团队管理</h2>
+            <p className="text-slate-400 text-xs md:text-sm mt-1">管理你的梦之队</p>
           </div>
-          <button onClick={openAddModal} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors flex items-center gap-2">
-            <span>+</span> 添加成员
+          <button onClick={openAddModal} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition-colors flex items-center gap-2 text-sm">
+            <span>+</span> <span className="hidden md:inline">添加成员</span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {members.map(member => (
               <div 
                 key={member.id}
+                onClick={(e) => window.innerWidth < 768 && handleContextMenu(e, member.id)} // 移动端点击触发菜单
                 onContextMenu={(e) => handleContextMenu(e, member.id)}
-                className="bg-slate-800 border border-slate-700 rounded-xl p-6 flex flex-col items-center gap-4 hover:border-emerald-500 hover:shadow-xl hover:-translate-y-1 transition-all group relative cursor-pointer select-none"
+                className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-6 flex flex-col items-center gap-3 md:gap-4 hover:border-emerald-500 hover:shadow-xl hover:-translate-y-1 transition-all group relative cursor-pointer select-none"
               >
-                <div className={`w-20 h-20 rounded-full border-4 border-slate-700 flex items-center justify-center text-3xl text-white font-bold overflow-hidden shadow-inner ${member.color}`}>
+                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-slate-700 flex items-center justify-center text-2xl md:text-3xl text-white font-bold overflow-hidden shadow-inner ${member.color}`}>
                   {member.avatar ? <img src={member.avatar} className="w-full h-full object-cover" /> : member.name[0]}
                 </div>
                 <div className="text-center w-full">
-                  <h3 className="text-lg font-bold text-white truncate px-2">{member.name}</h3>
-                  <div className="mt-1 inline-block px-2 py-0.5 bg-slate-900 rounded text-xs text-emerald-400 border border-slate-700 max-w-full truncate">{member.role}</div>
+                  <h3 className="text-base md:text-lg font-bold text-white truncate px-2">{member.name}</h3>
+                  <div className="mt-1 inline-block px-2 py-0.5 bg-slate-900 rounded text-[10px] md:text-xs text-emerald-400 border border-slate-700 max-w-full truncate">{member.role}</div>
                 </div>
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-500">⋮</div>
               </div>
             ))}
             {members.length === 0 && <div className="col-span-full py-10 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">暂无成员，点击右上角添加</div>}
@@ -152,13 +158,15 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
         </div>
       </div>
 
-      {/* 右：待办事项 */}
-      <TodoList todos={todos} members={members} onUpdate={onUpdateTodos} />
+      {/* 右：待办事项 (移动端受 Tab 控制，PC 端作为侧边栏) */}
+      <div className={`md:w-80 bg-slate-800 md:border-l border-slate-700 flex-col shrink-0 h-full ${activeTab === 'todos' ? 'flex w-full' : 'hidden md:flex'}`}>
+         <TodoList todos={todos} members={members} onUpdate={onUpdateTodos} />
+      </div>
 
-      {/* === 通用编辑弹窗 (Modal) === */}
+      {/* 编辑弹窗 */}
       {modal.isOpen && (
-        <div className="fixed inset-0 bg-black/70 z-[10000] flex items-center justify-center backdrop-blur-sm" onClick={() => setModal({ ...modal, isOpen: false })}>
-          <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl w-96 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 z-[10000] flex items-center justify-center backdrop-blur-sm px-4" onClick={() => setModal({ ...modal, isOpen: false })}>
+          <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-4">
               {modal.type === 'add' ? '添加新伙伴' : modal.type === 'rename' ? '修改名字' : '修改职位'}
             </h3>
@@ -179,7 +187,7 @@ export function TeamManager({ members, todos, onUpdateMembers, onUpdateTodos }: 
         </div>
       )}
 
-      {/* === 右键菜单 === */}
+      {/* 右键/点击 菜单 */}
       {contextMenu.visible && (
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setContextMenu(prev => ({ ...prev, visible: false }))}></div>

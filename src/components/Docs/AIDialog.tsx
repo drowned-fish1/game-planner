@@ -11,12 +11,13 @@ interface AIDialogProps {
   onClose: () => void;
 }
 
+// 核心修改：修改 Prompt，强制要求输出 HTML 标签，而非 Markdown
 const PROMPTS: Record<AIMode, string> = {
-  generate: "你是一个专业的游戏策划助手。请根据用户的指令生成一段详细的文档内容。要求逻辑清晰，格式规范（使用Markdown）。",
-  rewrite: "你是一个资深编辑。请润色以下文本，使其更加通顺、专业，保留原意的同时提升文采。直接输出润色后的结果。",
-  expand: "你是一个创意丰富的作家。请根据以下内容进行扩写，增加细节、背景描述或具体数据，使其更加丰富。直接输出结果。",
-  summarize: "请总结以下内容的核心要点，列出关键条目。",
-  translate: "请将以下内容翻译成英文（如果是英文则翻译成中文），保持游戏术语的准确性。"
+  generate: "你是一个专业的游戏策划助手。请根据用户的指令生成一段详细的文档内容。**请务必使用HTML标签格式输出**（使用 <h1>, <h2>, <h3> 表示标题，<p> 表示段落，<ul><li> 表示列表，<strong> 表示加粗）。**严禁使用 Markdown 语法（如 #, ##, - 等）**。",
+  rewrite: "你是一个资深编辑。请润色以下文本，使其更加通顺、专业。**请直接输出润色后的 HTML 内容**，保留原意的同时提升文采。",
+  expand: "你是一个创意丰富的作家。请根据以下内容进行扩写，增加细节。**请直接输出 HTML 格式的结果**。",
+  summarize: "请总结以下内容的核心要点。**请使用 HTML 无序列表 (<ul><li>) 输出关键条目**。",
+  translate: "请将以下内容翻译成英文（如果是英文则翻译成中文），保持游戏术语的准确性。**保持原有的 HTML 结构或输出 HTML 格式**。"
 };
 
 export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialogProps) {
@@ -51,7 +52,6 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
 
   return (
     <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      {/* 适配宽度: w-full max-w-[700px] */}
       <div className="bg-slate-800 border border-slate-700 w-full max-w-[700px] max-h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
         
         {/* Header */}
@@ -106,6 +106,7 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
                  )}
                </div>
 
+               {/* 预览区域：虽然我们要求 HTML，但这里还是当文本显示，插入时再解析 */}
                <div className={`p-3 md:p-4 rounded-lg border min-h-[100px] text-sm leading-relaxed whitespace-pre-wrap ${
                  error ? 'bg-red-900/20 border-red-500/50 text-red-300' : 'bg-slate-900 border-purple-500/30 text-slate-200'
                }`}>
