@@ -16,13 +16,13 @@ function buildServiceUrls(address, port) {
 }
 
 function getLanAddresses() {
-  const nets = os.networkInterfaces();
+  const networks = os.networkInterfaces();
   const addresses = [];
 
-  Object.values(nets).forEach((networks) => {
-    (networks || []).forEach((net) => {
-      if (!net || net.family !== 'IPv4' || net.internal) return;
-      addresses.push(net.address);
+  Object.values(networks).forEach((entries) => {
+    (entries || []).forEach((entry) => {
+      if (!entry || entry.family !== 'IPv4' || entry.internal) return;
+      addresses.push(entry.address);
     });
   });
 
@@ -165,14 +165,9 @@ class CollabServer {
     if (!req.url || req.url === '/' || req.url === '/info') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
+        deviceName: os.hostname(),
         service: this.getServiceInfo(),
-        rooms: Array.from(this.rooms.values()).map((room) => ({
-          id: room.id,
-          participantCount: room.participants.size,
-          revision: room.revision,
-          updatedAt: room.updatedAt,
-          projectName: room.projectName || '',
-        })),
+        rooms: this.getRoomsSummary(),
       }));
       return;
     }
@@ -277,6 +272,7 @@ class CollabServer {
         break;
       default:
         this.send(connection, 'room:error', { message: `Unsupported message type: ${type}` });
+        break;
     }
   }
 
@@ -304,7 +300,7 @@ class CollabServer {
 
     if (!room) {
       if (!snapshot) {
-        this.send(connection, 'room:error', { message: `Room "${roomId}" does not exist on this server` });
+        this.send(connection, 'room:error', { message: `Room "${roomId}" does not exist on this server.` });
         return;
       }
 
@@ -342,7 +338,7 @@ class CollabServer {
       lastSeen: Date.now(),
       presence: {
         activeModule: payload.activeModule || 'team',
-        status: payload.status || '在线',
+        status: payload.status || 'Online',
         focusedItemId: payload.focusedItemId || null,
         updatedAt: Date.now(),
       },
@@ -366,7 +362,7 @@ class CollabServer {
       color: connection.user.color,
       module: 'team',
       kind: 'join',
-      message: `${connection.user.name} 已加入房间`,
+      message: `${connection.user.name} joined the room`,
     });
 
     this.broadcastPresence(room);
@@ -442,7 +438,7 @@ class CollabServer {
       module: payload.module || 'team',
       kind: payload.kind || 'activity',
       itemId: payload.itemId || null,
-      message: payload.message || `${connection.user.name} 有新的操作`,
+      message: payload.message || `${connection.user.name} did something`,
     });
 
     this.broadcastPresence(room);
@@ -463,7 +459,7 @@ class CollabServer {
       color: connection.user.color,
       module: 'team',
       kind: 'leave',
-      message: `${connection.user.name} 已离开房间`,
+      message: `${connection.user.name} left the room`,
     });
 
     this.broadcastPresence(room);
@@ -497,6 +493,16 @@ class CollabServer {
         if (!left.isHost && right.isHost) return 1;
         return left.joinedAt - right.joinedAt;
       });
+  }
+
+  getRoomsSummary() {
+    return Array.from(this.rooms.values()).map((room) => ({
+      id: room.id,
+      participantCount: room.participants.size,
+      revision: room.revision,
+      updatedAt: room.updatedAt,
+      projectName: room.projectName || '',
+    }));
   }
 
   broadcastPresence(room) {

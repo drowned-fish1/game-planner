@@ -81,6 +81,21 @@ export interface JoinRoomOptions {
   status?: string;
 }
 
+export interface LanRoomSummary {
+  id: string;
+  participantCount: number;
+  revision: number;
+  updatedAt: number;
+  projectName: string;
+}
+
+export interface LanDiscoveredPeer {
+  deviceName: string;
+  address: string;
+  service: CollaborationServiceInfo | null;
+  rooms: LanRoomSummary[];
+}
+
 interface CollaborationMessage<T = unknown> {
   type: string;
   payload: T;
@@ -103,8 +118,21 @@ interface RoomClientHandlers {
   onDisconnected?: (reason?: string) => void;
 }
 
+interface ProxyEventEnvelope {
+  clientId: string;
+  type: string;
+  payload: unknown;
+}
+
+const proxySubscribers = new Map<string, Set<(type: string, payload: unknown) => void>>();
+let proxyBridgeInitialized = false;
+
 function getElectronAPI() {
   return window.electronAPI;
+}
+
+function hasDesktopProxy() {
+  return Boolean(getElectronAPI()?.invoke);
 }
 
 function randomColor() {
@@ -113,6 +141,49 @@ function randomColor() {
 
 function normalizePath(pathname: string) {
   return pathname && pathname !== '/' ? pathname : '/ws';
+}
+
+function shouldUseSecureWebSocket() {
+  return !hasDesktopProxy() && typeof window !== 'undefined' && window.location.protocol === 'https:';
+}
+
+function ensureProxyBridge() {
+  if (proxyBridgeInitialized || !hasDesktopProxy()) return;
+
+  getElectronAPI()?.on('collab:proxy-event', (rawEvent) => {
+    const event = rawEvent as ProxyEventEnvelope;
+    const handlers = proxySubscribers.get(event.clientId);
+    if (!handlers) return;
+    handlers.forEach((handler) => handler(event.type, event.payload));
+  });
+
+  proxyBridgeInitialized = true;
+}
+
+function subscribeProxyClient(clientId: string, handler: (type: string, payload: unknown) => void) {
+  ensureProxyBridge();
+  const handlers = proxySubscribers.get(clientId) || new Set();
+  handlers.add(handler);
+  proxySubscribers.set(clientId, handlers);
+
+  return () => {
+    const current = proxySubscribers.get(clientId);
+    if (!current) return;
+    current.delete(handler);
+    if (current.size === 0) {
+      proxySubscribers.delete(clientId);
+    }
+  };
+}
+
+function buildSocketCreationErrorMessage(error: unknown) {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+
+  if (/insecure websocket connection/i.test(rawMessage) || /page loaded over https/i.test(rawMessage)) {
+    return '当前页面运行在 HTTPS 下，远程联机地址必须使用 wss://。';
+  }
+
+  return rawMessage || '无法创建房间连接';
 }
 
 export function createEmptyRoomSession(): RoomSessionState {
@@ -175,6 +246,12 @@ export async function getLocalCollaborationServiceInfo(): Promise<CollaborationS
   return api.invoke<CollaborationServiceInfo>('collab:get-service-info');
 }
 
+export async function discoverLanRooms(): Promise<LanDiscoveredPeer[]> {
+  const api = getElectronAPI();
+  if (!api?.invoke) return [];
+  return api.invoke<LanDiscoveredPeer[]>('collab:discover-lan-rooms');
+}
+
 export function getPreferredLocalWsUrl(serviceInfo: CollaborationServiceInfo | null) {
   if (!serviceInfo?.ready || !serviceInfo.port) return '';
 
@@ -186,7 +263,6 @@ export function getPreferredLocalWsUrl(serviceInfo: CollaborationServiceInfo | n
 
 export function getShareableAddresses(serviceInfo: CollaborationServiceInfo | null) {
   if (!serviceInfo) return [];
-
   const direct = serviceInfo.addresses.filter((entry) => entry.address !== '127.0.0.1');
   return direct.length > 0 ? direct : serviceInfo.addresses;
 }
@@ -195,11 +271,13 @@ export function normalizeRoomServerUrl(input: string) {
   const trimmed = input.trim();
   if (!trimmed) return '';
 
-  const withProtocol = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `ws://${trimmed}`;
+  const defaultProtocol = shouldUseSecureWebSocket() ? 'wss://' : 'ws://';
+  const withProtocol = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `${defaultProtocol}${trimmed}`;
   const url = new URL(withProtocol);
 
   if (url.protocol === 'http:') url.protocol = 'ws:';
   if (url.protocol === 'https:') url.protocol = 'wss:';
+  if (shouldUseSecureWebSocket() && url.protocol === 'ws:') url.protocol = 'wss:';
 
   url.pathname = normalizePath(url.pathname === '/info' || url.pathname === '/health' ? '/ws' : url.pathname);
   url.search = '';
@@ -208,10 +286,20 @@ export function normalizeRoomServerUrl(input: string) {
   return url.toString();
 }
 
+export function buildPeerServerUrl(peer: LanDiscoveredPeer) {
+  const candidate = peer.service?.addresses.find((entry) => entry.address === peer.address);
+  if (candidate?.wsUrl) return candidate.wsUrl;
+
+  const port = peer.service?.port;
+  return port ? `ws://${peer.address}:${port}/ws` : '';
+}
+
 export class RoomClient {
   private readonly url: string;
   private readonly handlers: RoomClientHandlers;
   private socket: WebSocket | null = null;
+  private clientId: string | null = null;
+  private unsubProxy: (() => void) | null = null;
   private closedByUser = false;
   private connectedResolver: ((value: unknown) => void) | null = null;
   private connectedRejecter: ((reason?: unknown) => void) | null = null;
@@ -224,12 +312,107 @@ export class RoomClient {
 
   connect(options: JoinRoomOptions) {
     this.closedByUser = false;
+    return hasDesktopProxy() ? this.connectViaElectron(options) : this.connectViaBrowser(options);
+  }
 
+  private async connectViaElectron(options: JoinRoomOptions) {
+    const api = getElectronAPI();
+    if (!api?.invoke) {
+      throw new Error('Electron collaboration proxy unavailable');
+    }
+
+    return new Promise(async (resolve, reject) => {
+      this.connectedResolver = resolve;
+      this.connectedRejecter = reject;
+
+      try {
+        const { clientId } = await api.invoke<{ clientId: string }>('collab:proxy-connect', {
+          url: this.url,
+          joinPayload: options,
+        });
+
+        this.clientId = clientId;
+        this.unsubProxy = subscribeProxyClient(clientId, (type, payload) => {
+          this.handleProxyEvent(type, payload);
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to connect to room server';
+        this.handlers.onError?.(message);
+        this.connectedRejecter?.(new Error(message));
+        this.connectedResolver = null;
+        this.connectedRejecter = null;
+      }
+    });
+  }
+
+  private handleProxyEvent(type: string, payload: unknown) {
+    switch (type) {
+      case 'joined': {
+        const joinedPayload = payload as {
+          connectionId: string;
+          roomId: string;
+          revision: number;
+          snapshot?: ProjectContent;
+          participants: RoomParticipant[];
+          activityLog: RoomActivity[];
+          service?: CollaborationServiceInfo;
+        };
+
+        this.connectionId = joinedPayload.connectionId;
+        this.handlers.onJoined?.(joinedPayload);
+        this.connectedResolver?.(joinedPayload);
+        this.connectedResolver = null;
+        this.connectedRejecter = null;
+        break;
+      }
+      case 'room:presence':
+        this.handlers.onPresence?.(payload as { participants: RoomParticipant[]; revision: number });
+        break;
+      case 'room:update-content':
+        this.handlers.onContent?.(payload as { snapshot: ProjectContent; revision: number; actorId: string; updatedAt: number });
+        break;
+      case 'room:activity':
+        this.handlers.onActivity?.(payload as RoomActivity);
+        break;
+      case 'room:error': {
+        const errorPayload = payload as { message?: string };
+        const message = errorPayload?.message || 'Room error';
+        this.handlers.onError?.(message);
+        this.connectedRejecter?.(new Error(message));
+        this.connectedResolver = null;
+        this.connectedRejecter = null;
+        break;
+      }
+      case 'disconnected': {
+        const disconnectedPayload = payload as { reason?: string };
+        if (!this.closedByUser) {
+          this.handlers.onDisconnected?.(disconnectedPayload?.reason || 'Connection closed');
+        }
+        this.cleanupProxy();
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  private connectViaBrowser(options: JoinRoomOptions) {
     return new Promise((resolve, reject) => {
       this.connectedResolver = resolve;
       this.connectedRejecter = reject;
 
-      const socket = new WebSocket(this.url);
+      let socket: WebSocket;
+      try {
+        socket = new WebSocket(this.url);
+      } catch (error) {
+        const errorMessage = buildSocketCreationErrorMessage(error);
+        this.handlers.onError?.(errorMessage);
+        this.connectedRejecter?.(new Error(errorMessage));
+        this.connectedResolver = null;
+        this.connectedRejecter = null;
+        return;
+      }
+
       this.socket = socket;
 
       socket.onopen = () => {
@@ -282,7 +465,7 @@ export class RoomClient {
       };
 
       socket.onerror = () => {
-        const errorMessage = '无法连接到房间服务';
+        const errorMessage = 'Unable to connect to room server';
         this.handlers.onError?.(errorMessage);
         this.connectedRejecter?.(new Error(errorMessage));
         this.connectedResolver = null;
@@ -293,7 +476,7 @@ export class RoomClient {
         this.socket = null;
         this.connectionId = null;
         if (!this.closedByUser) {
-          this.handlers.onDisconnected?.(event.reason || '连接已断开');
+          this.handlers.onDisconnected?.(event.reason || 'Connection closed');
         }
       };
     });
@@ -301,6 +484,13 @@ export class RoomClient {
 
   disconnect() {
     this.closedByUser = true;
+
+    if (this.clientId && hasDesktopProxy()) {
+      getElectronAPI()?.invoke('collab:proxy-disconnect', { clientId: this.clientId });
+      this.cleanupProxy();
+      return;
+    }
+
     this.socket?.close(1000, 'Client disconnect');
     this.socket = null;
     this.connectionId = null;
@@ -319,7 +509,23 @@ export class RoomClient {
   }
 
   private send(type: string, payload: unknown) {
+    if (this.clientId && hasDesktopProxy()) {
+      getElectronAPI()?.invoke('collab:proxy-send', {
+        clientId: this.clientId,
+        type,
+        payload,
+      });
+      return;
+    }
+
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     this.socket.send(JSON.stringify({ type, payload }));
+  }
+
+  private cleanupProxy() {
+    this.unsubProxy?.();
+    this.unsubProxy = null;
+    this.clientId = null;
+    this.connectionId = null;
   }
 }

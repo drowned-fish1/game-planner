@@ -4,14 +4,23 @@ import {
   Activity,
   Copy,
   DoorOpen,
+  Network,
   PlugZap,
   RefreshCw,
+  Search,
   Server,
   Users,
   Wifi,
 } from 'lucide-react';
 import { TeamMember, TodoItem } from '../../utils/storage';
-import { getShareableAddresses, type CollaborationProfile, type RoomSessionState } from '../../utils/collaboration';
+import {
+  buildPeerServerUrl,
+  discoverLanRooms,
+  getShareableAddresses,
+  type CollaborationProfile,
+  type LanDiscoveredPeer,
+  type RoomSessionState,
+} from '../../utils/collaboration';
 import { TodoList } from './TodoList';
 
 interface TeamManagerProps {
@@ -54,6 +63,8 @@ export function TeamManager({
   const [roomIdInput, setRoomIdInput] = useState(collaboration.roomId || defaultRoomId);
   const [serverUrlInput, setServerUrlInput] = useState('');
   const [copiedText, setCopiedText] = useState('');
+  const [lanPeers, setLanPeers] = useState<LanDiscoveredPeer[]>([]);
+  const [lanLoading, setLanLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; memberId: string }>({
     visible: false,
     x: 0,
@@ -74,6 +85,11 @@ export function TeamManager({
   const shareableAddresses = useMemo(
     () => getShareableAddresses(collaboration.serviceInfo),
     [collaboration.serviceInfo],
+  );
+
+  const lanRooms = useMemo(
+    () => lanPeers.flatMap((peer) => peer.rooms.map((room) => ({ peer, room }))),
+    [lanPeers],
   );
 
   useEffect(() => {
@@ -102,6 +118,19 @@ export function TeamManager({
     connected: collaboration.mode === 'host' ? '主持中' : '已加入',
     error: '连接失败',
   }[collaboration.connectionState];
+
+  const scanLanRooms = async () => {
+    setLanLoading(true);
+    try {
+      const peers = await discoverLanRooms();
+      setLanPeers(peers.filter((peer) => peer.rooms.length > 0));
+    } catch (error) {
+      console.error('LAN discovery failed:', error);
+      setLanPeers([]);
+    } finally {
+      setLanLoading(false);
+    }
+  };
 
   const handleModalSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -146,7 +175,6 @@ export function TeamManager({
   const openRenameModal = () => {
     const member = members.find((entry) => entry.id === contextMenu.memberId);
     if (!member) return;
-
     setModal({ isOpen: true, type: 'rename', inputValue: member.name, targetId: member.id });
     setContextMenu((prev) => ({ ...prev, visible: false }));
   };
@@ -154,7 +182,6 @@ export function TeamManager({
   const openRoleModal = () => {
     const member = members.find((entry) => entry.id === contextMenu.memberId);
     if (!member) return;
-
     setModal({ isOpen: true, type: 'role', inputValue: member.role, targetId: member.id });
     setContextMenu((prev) => ({ ...prev, visible: false }));
   };
@@ -195,14 +222,6 @@ export function TeamManager({
     onUpdateMembers(members.filter((member) => member.id !== contextMenu.memberId));
     onActivity({ kind: 'member:remove', message: `${profile.name} 移除了成员 ${target.name}` });
     setContextMenu((prev) => ({ ...prev, visible: false }));
-  };
-
-  const handleHostRoom = async () => {
-    await onHostRoom(roomIdInput.trim() || defaultRoomId);
-  };
-
-  const handleJoinRoom = async () => {
-    await onJoinRoom(serverUrlInput.trim(), roomIdInput.trim() || defaultRoomId);
   };
 
   const roomPanel = (
@@ -257,7 +276,7 @@ export function TeamManager({
                     {collaboration.serviceInfo?.port || '未启动'}
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-400">
-                    把这个端口做内网穿透后，把外部地址发给队友，他们就能加入当前房间。
+                    这个端口既可以给 FRP TCP 转发，也可以给同局域网的设备直接加入。
                   </p>
                 </div>
 
@@ -314,7 +333,7 @@ export function TeamManager({
                 </label>
 
                 <button
-                  onClick={() => void handleHostRoom()}
+                  onClick={() => void onHostRoom(roomIdInput.trim() || defaultRoomId)}
                   disabled={collaboration.connectionState === 'connecting'}
                   className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                 >
@@ -342,12 +361,12 @@ export function TeamManager({
                     value={serverUrlInput}
                     onChange={(event) => setServerUrlInput(event.target.value)}
                     className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
-                    placeholder="ws://example.com:17888/ws"
+                    placeholder="frp-off.com:19077 或 ws://frp-off.com:19077/ws"
                   />
                 </label>
 
                 <button
-                  onClick={() => void handleJoinRoom()}
+                  onClick={() => void onJoinRoom(serverUrlInput.trim(), roomIdInput.trim() || defaultRoomId)}
                   disabled={collaboration.connectionState === 'connecting'}
                   className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                 >
@@ -355,7 +374,7 @@ export function TeamManager({
                 </button>
 
                 <div className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs leading-5 text-slate-400">
-                  支持 `ws://host:port/ws`、`http://host:port` 或 `host:port`。加入后会以房间里的项目快照为准。
+                  支持 `frp-off.com:19077`、`ws://host:port/ws`、`http://host:port`。桌面端会通过主进程代理连接，所以 TCP 隧道也能用。
                 </div>
 
                 {collaboration.error && (
@@ -370,6 +389,55 @@ export function TeamManager({
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+            <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Network size={16} className="text-emerald-400" />
+                局域网房间
+              </div>
+              <button
+                onClick={() => void scanLanRooms()}
+                disabled={lanLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {lanLoading ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
+                扫描局域网
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {lanRooms.map(({ peer, room }) => {
+                const peerUrl = buildPeerServerUrl(peer);
+                return (
+                  <div key={`${peer.address}-${room.id}`} className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-950/60 p-3 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-white">{room.projectName || room.id}</div>
+                      <div className="mt-1 text-xs text-slate-400">
+                        设备 {peer.deviceName} · 地址 {peer.address}:{peer.service?.port || '-'} · 房间号 {room.id}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {room.participantCount} 人在线 · 修订 {room.revision}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => void onJoinRoom(peerUrl, room.id)}
+                      disabled={!peerUrl || collaboration.connectionState === 'connecting'}
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                    >
+                      直接加入
+                    </button>
+                  </div>
+                );
+              })}
+
+              {!lanLoading && lanRooms.length === 0 && (
+                <div className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-500">
+                  还没有发现局域网中的房间。确保对方也打开了应用，并主持了一个房间后再扫描。
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -423,7 +491,7 @@ export function TeamManager({
 
               {collaboration.participants.length === 0 && (
                 <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-500">
-                  还没有人在房间里。先主持一个房间，或者用上面的地址邀请队友。
+                  还没有人在房间里。先主持一个房间，或者加入一个局域网 / 远程房间。
                 </div>
               )}
             </div>

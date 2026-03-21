@@ -1,13 +1,22 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { CollabServer } = require('./collab-server');
+const { MainProcessCollabClientManager } = require('./collab-client');
+const { LanDiscoveryService } = require('./lan-discovery');
 
 const APP_ROOT = path.join(__dirname, '..');
 const DATA_FILE = path.join(app.getPath('userData'), 'gp_data.json');
 
 let win = null;
 const collabServer = new CollabServer();
+const collabClientManager = new MainProcessCollabClientManager();
+const lanDiscovery = new LanDiscoveryService(() => ({
+  deviceName: os.hostname(),
+  service: collabServer.getServiceInfo(),
+  rooms: collabServer.getRoomsSummary(),
+}));
 
 function createWindow() {
   win = new BrowserWindow({
@@ -68,11 +77,33 @@ ipcMain.handle('collab:get-service-info', async () => {
   }
 });
 
+ipcMain.handle('collab:proxy-connect', (event, payload) => {
+  return collabClientManager.connect(event.sender, payload);
+});
+
+ipcMain.handle('collab:proxy-send', (_event, payload) => {
+  return collabClientManager.send(payload.clientId, payload.type, payload.payload);
+});
+
+ipcMain.handle('collab:proxy-disconnect', (_event, payload) => {
+  return collabClientManager.disconnect(payload.clientId);
+});
+
+ipcMain.handle('collab:discover-lan-rooms', async () => {
+  try {
+    return await lanDiscovery.discover();
+  } catch (error) {
+    console.error('LAN discovery failed:', error);
+    return [];
+  }
+});
+
 app.whenReady().then(async () => {
   try {
     await collabServer.start();
+    await lanDiscovery.start();
   } catch (error) {
-    console.error('Failed to bootstrap collaboration server:', error);
+    console.error('Failed to bootstrap collaboration services:', error);
   }
 
   createWindow();
