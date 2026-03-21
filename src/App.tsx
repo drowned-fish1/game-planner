@@ -1,54 +1,345 @@
-// src/App.tsx
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Settings as SettingsIcon,
+  Lightbulb,
+  Users,
+  FileText,
+  Layout,
+  ChevronLeft,
+} from 'lucide-react';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { BrainstormBoard } from './components/Brainstorm/Board';
 import { TeamManager } from './components/Team/TeamManager';
-import { ProjectMeta, ProjectContent, loadProjectContent, saveProjectContent } from './utils/storage';
 import { Docs } from './components/Docs/Docs';
 import { UIManager } from './components/UIPrototype/UIManager';
 import { Settings } from './components/Settings/Settings';
-import { 
-  Settings as SettingsIcon, 
-  Lightbulb, 
-  Users, 
-  FileText, 
-  Layout, 
-  ChevronLeft,
-  Menu
-} from 'lucide-react'; 
+import { loadProjectContent, ProjectContent, ProjectMeta, saveProjectContent } from './utils/storage';
+import {
+  createDefaultRoomId,
+  createEmptyRoomSession,
+  getLocalCollaborationServiceInfo,
+  getPreferredLocalWsUrl,
+  loadCollaborationProfile,
+  normalizeRoomServerUrl,
+  RoomClient,
+  RoomSessionState,
+  saveCollaborationProfile,
+  type CollaborationProfile,
+  type RoomActivity,
+} from './utils/collaboration';
 
-// 定义模块类型
-type ModuleType = 'brainstorm' | 'docs' | 'ui-designer' | 'team' | 'ui' | 'settings';
+type ModuleType = 'brainstorm' | 'docs' | 'team' | 'ui' | 'settings';
+
+function moduleStatusLabel(module: ModuleType) {
+  switch (module) {
+    case 'brainstorm':
+      return '正在整理白板';
+    case 'docs':
+      return '正在编辑文档';
+    case 'team':
+      return '正在查看房间';
+    case 'ui':
+      return '正在调整 UI 原型';
+    case 'settings':
+      return '正在查看设置';
+    default:
+      return '在线';
+  }
+}
+
+function appendActivity(list: RoomActivity[], activity: RoomActivity) {
+  const next = [activity, ...list.filter((entry) => entry.id !== activity.id)];
+  return next.slice(0, 30);
+}
 
 function App() {
   const [currentProject, setCurrentProject] = useState<ProjectMeta | null>(null);
   const [projectContent, setProjectContent] = useState<ProjectContent | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [activeModule, setActiveModule] = useState<ModuleType>('brainstorm');
+  const [collaboration, setCollaboration] = useState<RoomSessionState>(createEmptyRoomSession);
+  const [profile, setProfile] = useState<CollaborationProfile>(() => loadCollaborationProfile());
+
+  const roomClientRef = useRef<RoomClient | null>(null);
+  const projectContentRef = useRef<ProjectContent | null>(null);
+  const lastBroadcastSnapshotRef = useRef('');
+  const suppressNextBroadcastRef = useRef(false);
+  const presenceTimerRef = useRef<number | null>(null);
+  const queuedPresenceRef = useRef<{ status: string; focusedItemId?: string | null } | null>(null);
+
+  const defaultRoomId = currentProject ? createDefaultRoomId(currentProject.id) : '';
+
+  useEffect(() => {
+    projectContentRef.current = projectContent;
+  }, [projectContent]);
+
+  useEffect(() => {
+    saveCollaborationProfile(profile);
+  }, [profile]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    getLocalCollaborationServiceInfo().then((serviceInfo) => {
+      if (!disposed) {
+        setCollaboration((prev) => ({ ...prev, serviceInfo }));
+      }
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      roomClientRef.current?.disconnect();
+      roomClientRef.current = null;
+    };
+  }, []);
+
+  const refreshServiceInfo = async () => {
+    const serviceInfo = await getLocalCollaborationServiceInfo();
+    setCollaboration((prev) => ({ ...prev, serviceInfo }));
+    return serviceInfo;
+  };
+
+  const disconnectRoom = (preserveServiceInfo = true) => {
+    roomClientRef.current?.disconnect();
+    roomClientRef.current = null;
+    lastBroadcastSnapshotRef.current = '';
+    suppressNextBroadcastRef.current = false;
+    if (presenceTimerRef.current) {
+      window.clearTimeout(presenceTimerRef.current);
+      presenceTimerRef.current = null;
+    }
+    queuedPresenceRef.current = null;
+
+    setCollaboration((prev) => ({
+      ...createEmptyRoomSession(),
+      serviceInfo: preserveServiceInfo ? prev.serviceInfo : null,
+    }));
+  };
+
+  const schedulePresenceUpdate = (status: string, focusedItemId?: string | null) => {
+    if (collaboration.connectionState !== 'connected') return;
+
+    queuedPresenceRef.current = { status, focusedItemId };
+    if (presenceTimerRef.current) return;
+
+    presenceTimerRef.current = window.setTimeout(() => {
+      presenceTimerRef.current = null;
+      const payload = queuedPresenceRef.current;
+      queuedPresenceRef.current = null;
+      if (!payload) return;
+
+      roomClientRef.current?.sendPresenceUpdate({
+        activeModule,
+        status: payload.status,
+        focusedItemId: payload.focusedItemId ?? null,
+      });
+    }, 120);
+  };
+
+  const publishActivity = (activity: {
+    kind: string;
+    message: string;
+    itemId?: string | null;
+    focusedItemId?: string | null;
+    status?: string;
+  }) => {
+    if (collaboration.connectionState !== 'connected') return;
+
+    roomClientRef.current?.sendActivity({
+      module: activeModule,
+      kind: activity.kind,
+      message: activity.message,
+      itemId: activity.itemId || null,
+      focusedItemId: activity.focusedItemId ?? null,
+      status: activity.status,
+    });
+  };
+
+  const connectToRoom = async (mode: 'host' | 'guest', serverUrl: string, roomId: string) => {
+    if (!currentProject || !projectContent) return;
+
+    const normalizedUrl = normalizeRoomServerUrl(serverUrl);
+    const sanitizedProfile = {
+      ...profile,
+      name: profile.name.trim() || `玩家${profile.id.slice(0, 4)}`,
+    };
+    if (!normalizedUrl) {
+      setCollaboration((prev) => ({
+        ...prev,
+        connectionState: 'error',
+        error: '房间地址不能为空',
+      }));
+      return;
+    }
+
+    setProfile(sanitizedProfile);
+    disconnectRoom();
+
+    setCollaboration((prev) => ({
+      ...prev,
+      connectionState: 'connecting',
+      mode,
+      serverUrl: normalizedUrl,
+      roomId,
+      error: null,
+    }));
+
+    const client = new RoomClient(normalizedUrl, {
+      onJoined: (payload) => {
+        setCollaboration((prev) => ({
+          ...prev,
+          connectionState: 'connected',
+          mode,
+          serverUrl: normalizedUrl,
+          roomId: payload.roomId,
+          revision: payload.revision,
+          error: null,
+          selfConnectionId: payload.connectionId,
+          participants: payload.participants,
+          activityLog: payload.activityLog || [],
+          serviceInfo: payload.service || prev.serviceInfo,
+        }));
+
+        if (payload.snapshot) {
+          const remoteRaw = JSON.stringify(payload.snapshot);
+          lastBroadcastSnapshotRef.current = remoteRaw;
+          if (remoteRaw !== JSON.stringify(projectContentRef.current)) {
+            suppressNextBroadcastRef.current = true;
+            setProjectContent(payload.snapshot);
+          }
+        }
+      },
+      onPresence: (payload) => {
+        setCollaboration((prev) => ({
+          ...prev,
+          participants: payload.participants,
+          revision: payload.revision,
+        }));
+      },
+      onContent: (payload) => {
+        setCollaboration((prev) => ({
+          ...prev,
+          revision: payload.revision,
+        }));
+
+        if (payload.actorId === client.connectionId) {
+          return;
+        }
+
+        const remoteRaw = JSON.stringify(payload.snapshot);
+        lastBroadcastSnapshotRef.current = remoteRaw;
+        suppressNextBroadcastRef.current = true;
+        setProjectContent(payload.snapshot);
+      },
+      onActivity: (activity) => {
+        setCollaboration((prev) => ({
+          ...prev,
+          activityLog: appendActivity(prev.activityLog, activity),
+        }));
+      },
+      onError: (message) => {
+        setCollaboration((prev) => ({
+          ...prev,
+          connectionState: 'error',
+          error: message,
+        }));
+      },
+      onDisconnected: (reason) => {
+        if (roomClientRef.current === client) {
+          roomClientRef.current = null;
+        }
+        setCollaboration((prev) => ({
+          ...prev,
+          connectionState: 'idle',
+          error: reason || '连接已断开',
+          selfConnectionId: null,
+          participants: [],
+        }));
+      },
+    });
+
+    roomClientRef.current = client;
+
+    try {
+      await client.connect({
+        roomId,
+        user: sanitizedProfile,
+        isHost: mode === 'host',
+        snapshot: mode === 'host' ? projectContent : undefined,
+        projectId: currentProject.id,
+        projectName: currentProject.name,
+        activeModule,
+        status: mode === 'host' ? '正在主持房间' : moduleStatusLabel(activeModule),
+      });
+    } catch (error) {
+      if (roomClientRef.current === client) {
+        roomClientRef.current = null;
+      }
+      client.disconnect();
+      setCollaboration((prev) => ({
+        ...prev,
+        connectionState: 'error',
+        error: error instanceof Error ? error.message : '连接房间失败',
+      }));
+    }
+  };
+
+  const hostRoom = async (roomId: string) => {
+    const serviceInfo = collaboration.serviceInfo?.ready
+      ? collaboration.serviceInfo
+      : await refreshServiceInfo();
+    const localUrl = getPreferredLocalWsUrl(serviceInfo);
+
+    if (!localUrl) {
+      setCollaboration((prev) => ({
+        ...prev,
+        connectionState: 'error',
+        error: serviceInfo.error || '本地房间服务未启动',
+      }));
+      return;
+    }
+
+    await connectToRoom('host', localUrl, roomId);
+  };
+
+  const joinRoom = async (serverUrl: string, roomId: string) => {
+    await connectToRoom('guest', serverUrl, roomId);
+  };
 
   const openProject = (project: ProjectMeta) => {
+    disconnectRoom();
     setCurrentProject(project);
     setProjectContent(loadProjectContent(project.id));
+    setActiveModule('brainstorm');
   };
 
   const closeProject = () => {
-    if (currentProject && projectContent) saveProjectContent(currentProject.id, projectContent);
+    if (currentProject && projectContent) {
+      saveProjectContent(currentProject.id, projectContent);
+    }
+    disconnectRoom();
     setCurrentProject(null);
     setProjectContent(null);
   };
 
-  // 自动保存逻辑
   useEffect(() => {
     if (!currentProject || !projectContent) return;
     setSaveStatus('unsaved');
-    const timer = setTimeout(() => {
+
+    const timer = window.setTimeout(() => {
       setSaveStatus('saving');
       saveProjectContent(currentProject.id, projectContent);
-      setTimeout(() => setSaveStatus('saved'), 500);
+      window.setTimeout(() => setSaveStatus('saved'), 500);
     }, 2000);
-    return () => clearTimeout(timer);
-  }, [projectContent]);
 
-  // Ctrl+S 快捷键保存
+    return () => window.clearTimeout(timer);
+  }, [currentProject, projectContent]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -56,162 +347,306 @@ function App() {
         if (currentProject && projectContent) {
           setSaveStatus('saving');
           saveProjectContent(currentProject.id, projectContent);
-          setTimeout(() => setSaveStatus('saved'), 500);
+          window.setTimeout(() => setSaveStatus('saved'), 500);
         }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentProject, projectContent]);
 
-  if (!currentProject) return <Dashboard onOpenProject={openProject} />;
-  if (!projectContent) return <div className="h-screen w-screen bg-slate-900 text-white flex items-center justify-center">加载数据中...</div>;
+  useEffect(() => {
+    if (collaboration.connectionState !== 'connected' || !projectContent) return;
 
-  return (
-    <div className="flex h-screen w-screen bg-slate-900 text-slate-200 overflow-hidden flex-col md:flex-row">
-       <ProjectEditorLayout 
-         project={currentProject} 
-         content={projectContent} 
-         setContent={setProjectContent}
-         onBack={closeProject}
-         saveStatus={saveStatus}
-       />
-    </div>
-  );
-}
+    const rawSnapshot = JSON.stringify(projectContent);
+    if (suppressNextBroadcastRef.current) {
+      suppressNextBroadcastRef.current = false;
+      lastBroadcastSnapshotRef.current = rawSnapshot;
+      return;
+    }
 
-function ProjectEditorLayout({ project, content, setContent, onBack, saveStatus }: any) {
-  const [activeModule, setActiveModule] = useState<ModuleType>('brainstorm');
+    if (lastBroadcastSnapshotRef.current === rawSnapshot) return;
 
-  // === 数据更新处理函数 (保留完整逻辑) ===
+    const timer = window.setTimeout(() => {
+      lastBroadcastSnapshotRef.current = rawSnapshot;
+      roomClientRef.current?.sendContentUpdate({
+        snapshot: JSON.parse(rawSnapshot),
+        activeModule,
+        status: moduleStatusLabel(activeModule),
+        focusedItemId: null,
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [projectContent, collaboration.connectionState, activeModule]);
+
+  useEffect(() => {
+    if (collaboration.connectionState !== 'connected') return;
+    schedulePresenceUpdate(moduleStatusLabel(activeModule), null);
+  }, [activeModule, collaboration.connectionState]);
+
   const handleBrainstormChange = (newItems: any[], newConnections: any[]) => {
-    setContent((prev: any) => {
+    setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, brainstorm: { items: newItems, connections: newConnections } };
     });
   };
 
   const handleUpdateMembers = (newMembers: any[]) => {
-    setContent((prev: any) => {
+    setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, members: newMembers };
     });
+    publishActivity({ kind: 'members:update', message: `${profile.name} 更新了团队成员` });
   };
 
   const handleUpdateTodos = (newTodos: any[]) => {
-    setContent((prev: any) => {
+    setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, todos: newTodos };
     });
   };
 
   const handleUpdateDocs = (newDocs: any[]) => {
-    setContent((prev: any) => {
+    setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, docs: newDocs };
     });
   };
 
   const handleUpdateUI = (newUIData: any) => {
-    setContent((prev: any) => {
+    setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, ui: newUIData };
     });
   };
 
-  // 渲染当前激活的模块
+  const teamParticipants = useMemo(
+    () => collaboration.participants.filter((participant) => participant.connectionId !== collaboration.selfConnectionId),
+    [collaboration.participants, collaboration.selfConnectionId],
+  );
+
+  if (!currentProject) return <Dashboard onOpenProject={openProject} />;
+  if (!projectContent) {
+    return <div className="flex h-screen w-screen items-center justify-center bg-slate-900 text-white">Loading project...</div>;
+  }
+
+  return (
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-900 text-slate-200 md:flex-row">
+      <ProjectEditorLayout
+        project={currentProject}
+        content={projectContent}
+        activeModule={activeModule}
+        saveStatus={saveStatus}
+        onBack={closeProject}
+        onSetActiveModule={setActiveModule}
+        onBrainstormChange={handleBrainstormChange}
+        onUpdateMembers={handleUpdateMembers}
+        onUpdateTodos={handleUpdateTodos}
+        onUpdateDocs={handleUpdateDocs}
+        onUpdateUI={handleUpdateUI}
+        collaboration={collaboration}
+        profile={profile}
+        defaultRoomId={defaultRoomId}
+        onUpdateProfile={setProfile}
+        onHostRoom={hostRoom}
+        onJoinRoom={joinRoom}
+        onLeaveRoom={() => disconnectRoom()}
+        onRefreshServiceInfo={refreshServiceInfo}
+        onPresenceChange={schedulePresenceUpdate}
+        onActivity={publishActivity}
+        remoteParticipants={teamParticipants}
+      />
+    </div>
+  );
+}
+
+interface ProjectEditorLayoutProps {
+  project: ProjectMeta;
+  content: ProjectContent;
+  activeModule: ModuleType;
+  saveStatus: 'saved' | 'saving' | 'unsaved';
+  collaboration: RoomSessionState;
+  profile: CollaborationProfile;
+  defaultRoomId: string;
+  remoteParticipants: RoomSessionState['participants'];
+  onBack: () => void;
+  onSetActiveModule: (module: ModuleType) => void;
+  onBrainstormChange: (items: any[], connections: any[]) => void;
+  onUpdateMembers: (members: any[]) => void;
+  onUpdateTodos: (todos: any[]) => void;
+  onUpdateDocs: (docs: any[]) => void;
+  onUpdateUI: (uiData: any) => void;
+  onUpdateProfile: (profile: CollaborationProfile) => void;
+  onHostRoom: (roomId: string) => Promise<void>;
+  onJoinRoom: (serverUrl: string, roomId: string) => Promise<void>;
+  onLeaveRoom: () => void;
+  onRefreshServiceInfo: () => Promise<unknown>;
+  onPresenceChange: (status: string, focusedItemId?: string | null) => void;
+  onActivity: (activity: {
+    kind: string;
+    message: string;
+    itemId?: string | null;
+    focusedItemId?: string | null;
+    status?: string;
+  }) => void;
+}
+
+function ProjectEditorLayout({
+  project,
+  content,
+  activeModule,
+  saveStatus,
+  collaboration,
+  profile,
+  defaultRoomId,
+  remoteParticipants,
+  onBack,
+  onSetActiveModule,
+  onBrainstormChange,
+  onUpdateMembers,
+  onUpdateTodos,
+  onUpdateDocs,
+  onUpdateUI,
+  onUpdateProfile,
+  onHostRoom,
+  onJoinRoom,
+  onLeaveRoom,
+  onRefreshServiceInfo,
+  onPresenceChange,
+  onActivity,
+}: ProjectEditorLayoutProps) {
   const renderModule = () => {
-    switch(activeModule) {
-      case 'brainstorm': 
-        return <BrainstormBoard key={project.id + '-brainstorm'} initialItems={content.brainstorm?.items || []} initialConnections={content.brainstorm?.connections || []} onDataChange={handleBrainstormChange} />;
-      case 'team': 
-        return <TeamManager members={content.members || []} todos={content.todos || []} onUpdateMembers={handleUpdateMembers} onUpdateTodos={handleUpdateTodos} />;
-      case 'docs': 
-        return <Docs initialDocs={content.docs || []} onUpdate={handleUpdateDocs} />;
-      case 'ui': 
-        return <UIManager data={content.ui || { pages: [] }} onUpdate={handleUpdateUI} />;
-      case 'settings': 
+    switch (activeModule) {
+      case 'brainstorm':
+        return (
+          <BrainstormBoard
+            key={`${project.id}-brainstorm`}
+            initialItems={content.brainstorm?.items || []}
+            initialConnections={content.brainstorm?.connections || []}
+            onDataChange={onBrainstormChange}
+            participants={collaboration.participants}
+            selfConnectionId={collaboration.selfConnectionId}
+            isConnected={collaboration.connectionState === 'connected'}
+            onPresenceChange={onPresenceChange}
+            onActivity={onActivity}
+          />
+        );
+      case 'team':
+        return (
+          <TeamManager
+            projectName={project.name}
+            members={content.members || []}
+            todos={content.todos || []}
+            collaboration={collaboration}
+            profile={profile}
+            defaultRoomId={defaultRoomId}
+            onUpdateMembers={onUpdateMembers}
+            onUpdateTodos={onUpdateTodos}
+            onUpdateProfile={onUpdateProfile}
+            onHostRoom={onHostRoom}
+            onJoinRoom={onJoinRoom}
+            onLeaveRoom={onLeaveRoom}
+            onRefreshServiceInfo={onRefreshServiceInfo}
+            onActivity={onActivity}
+          />
+        );
+      case 'docs':
+        return <Docs initialDocs={content.docs || []} onUpdate={onUpdateDocs} />;
+      case 'ui':
+        return <UIManager data={content.ui || { pages: [] }} onUpdate={onUpdateUI} />;
+      case 'settings':
         return <Settings />;
-      default: 
+      default:
         return null;
     }
   };
 
   return (
     <>
-      {/* === 桌面端侧边栏 (MD及以上显示) === */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-slate-800 border-r border-slate-700 z-50">
-        <div className="h-14 flex items-center px-4 border-b border-slate-700 gap-3">
-          <button onClick={onBack} className="p-2 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors">
+      <aside className="z-50 hidden w-64 shrink-0 flex-col border-r border-slate-700 bg-slate-800 md:flex">
+        <div className="flex h-14 items-center gap-3 border-b border-slate-700 px-4">
+          <button onClick={onBack} className="rounded p-2 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white">
             <ChevronLeft size={20} />
           </button>
-          <div className="font-bold text-white truncate flex-1">{project.name}</div>
+          <div className="flex-1 truncate font-bold text-white">{project.name}</div>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
-          <SidebarBtn icon={<Lightbulb size={18}/>} label="灵感白板" isActive={activeModule === 'brainstorm'} onClick={() => setActiveModule('brainstorm')} />
-          <SidebarBtn icon={<Users size={18}/>} label="团队管理" isActive={activeModule === 'team'} onClick={() => setActiveModule('team')} />
-          <SidebarBtn icon={<FileText size={18}/>} label="策划文档" isActive={activeModule === 'docs'} onClick={() => setActiveModule('docs')} />
-          <SidebarBtn icon={<Layout size={18}/>} label="UI 原型机" isActive={activeModule === 'ui'} onClick={() => setActiveModule('ui')} />
-          
-          <div className="h-px bg-slate-700 my-2"></div>
-          
-          <button 
-             onClick={() => setActiveModule('settings')}
-             className={`w-full text-left px-4 py-3 rounded-md transition-all flex items-center gap-3 ${activeModule === 'settings' ? 'bg-emerald-600 text-white shadow-md' : 'hover:bg-slate-700 text-slate-400 hover:text-slate-200'}`}
+
+        <nav className="flex-1 space-y-2 p-4">
+          <SidebarBtn icon={<Lightbulb size={18} />} label="灵感白板" isActive={activeModule === 'brainstorm'} onClick={() => onSetActiveModule('brainstorm')} />
+          <SidebarBtn icon={<Users size={18} />} label="房间联机" isActive={activeModule === 'team'} onClick={() => onSetActiveModule('team')} />
+          <SidebarBtn icon={<FileText size={18} />} label="策划文档" isActive={activeModule === 'docs'} onClick={() => onSetActiveModule('docs')} />
+          <SidebarBtn icon={<Layout size={18} />} label="UI 原型" isActive={activeModule === 'ui'} onClick={() => onSetActiveModule('ui')} />
+
+          <div className="my-2 h-px bg-slate-700" />
+
+          <button
+            onClick={() => onSetActiveModule('settings')}
+            className={`flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition-all ${
+              activeModule === 'settings'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+            }`}
           >
-             <SettingsIcon size={18} /> 设置
+            <SettingsIcon size={18} />
+            设置
           </button>
         </nav>
 
-        <div className="p-4 text-xs border-t border-slate-700 text-center text-slate-500">
-           {saveStatus === 'saving' ? '💾 保存中...' : '✔ 已保存'}
+        <div className="border-t border-slate-700 p-4 text-center text-xs text-slate-500">
+          {collaboration.connectionState === 'connected'
+            ? `房间中 · ${remoteParticipants.length + 1} 人`
+            : saveStatus === 'saving'
+              ? 'Saving...'
+              : 'Saved'}
         </div>
       </aside>
 
-      {/* === 移动端顶部栏 (MD以下显示) === */}
-      <div 
-        className="md:hidden bg-slate-800 border-b border-slate-700 flex items-end px-4 justify-between shrink-0 pb-3"
-        style={{ 
-          height: 'calc(3.5rem + env(safe-area-inset-top))', // 适配全面屏顶部
-          paddingTop: 'env(safe-area-inset-top)' 
+      <div
+        className="flex shrink-0 items-end justify-between border-b border-slate-700 bg-slate-800 px-4 pb-3 md:hidden"
+        style={{
+          height: 'calc(3.5rem + env(safe-area-inset-top))',
+          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-          <button onClick={onBack} className="text-slate-300 p-1"><ChevronLeft size={24}/></button>
-          <span className="font-bold text-white mb-1">{project.name}</span>
-          <button onClick={() => setActiveModule('settings')} className="text-slate-300 p-1"><SettingsIcon size={20}/></button>
+        <button onClick={onBack} className="p-1 text-slate-300">
+          <ChevronLeft size={24} />
+        </button>
+        <span className="mb-1 font-bold text-white">{project.name}</span>
+        <button onClick={() => onSetActiveModule('settings')} className="p-1 text-slate-300">
+          <SettingsIcon size={20} />
+        </button>
       </div>
 
-      {/* === 主内容区 === */}
-      <main className="flex-1 relative overflow-hidden bg-slate-900 pb-16 md:pb-0"> 
-        {renderModule()}
-      </main>
+      <main className="relative flex-1 overflow-hidden bg-slate-900 pb-16 md:pb-0">{renderModule()}</main>
 
-      {/* === 移动端底部导航栏 (MD以下显示) === */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-800 border-t border-slate-700 flex justify-around items-center z-[9999] pb-[env(safe-area-inset-bottom)]">
-          <MobileNavBtn icon={<Lightbulb size={20}/>} label="白板" isActive={activeModule === 'brainstorm'} onClick={() => setActiveModule('brainstorm')} />
-          <MobileNavBtn icon={<Users size={20}/>} label="团队" isActive={activeModule === 'team'} onClick={() => setActiveModule('team')} />
-          <MobileNavBtn icon={<FileText size={20}/>} label="文档" isActive={activeModule === 'docs'} onClick={() => setActiveModule('docs')} />
-          {/* UI 原型机在手机端操作不便，暂不放入底部导航，可通过侧边栏或后续添加 */}
+      <div className="fixed bottom-0 left-0 right-0 z-[9999] flex h-16 items-center justify-around border-t border-slate-700 bg-slate-800 pb-[env(safe-area-inset-bottom)] md:hidden">
+        <MobileNavBtn icon={<Lightbulb size={20} />} label="白板" isActive={activeModule === 'brainstorm'} onClick={() => onSetActiveModule('brainstorm')} />
+        <MobileNavBtn icon={<Users size={20} />} label="房间" isActive={activeModule === 'team'} onClick={() => onSetActiveModule('team')} />
+        <MobileNavBtn icon={<FileText size={20} />} label="文档" isActive={activeModule === 'docs'} onClick={() => onSetActiveModule('docs')} />
       </div>
     </>
   );
 }
 
-// 桌面端侧边栏按钮组件
 function SidebarBtn({ icon, label, isActive, onClick }: any) {
   return (
-    <button onClick={onClick} className={`w-full text-left px-4 py-3 rounded-md transition-all flex items-center gap-3 ${isActive ? 'bg-emerald-600 text-white shadow-md' : 'hover:bg-slate-700 text-slate-400 hover:text-slate-200'}`}>
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition-all ${
+        isActive ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+      }`}
+    >
       {icon}
       <span>{label}</span>
     </button>
   );
 }
 
-// 移动端底部导航按钮组件
 function MobileNavBtn({ icon, label, isActive, onClick }: any) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${isActive ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}>
+    <button onClick={onClick} className={`flex h-full w-full flex-col items-center justify-center gap-1 ${isActive ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}>
       {icon}
       <span className="text-[10px]">{label}</span>
     </button>

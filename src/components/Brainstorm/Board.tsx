@@ -1,240 +1,355 @@
-// src/components/Brainstorm/Board.tsx
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Xarrow, { Xwrapper, useXarrow } from 'react-xarrows';
 import { toPng } from 'html-to-image';
-import { TransformWrapper, TransformComponent, ReactZoomPanPinchContentRef } from 'react-zoom-pan-pinch';
-import { NoteCard } from './NoteCard';
-import { 
-  Image, Type, Video, Code, Link, Music, MoreHorizontal, Activity, Bot, 
-  Plus, Move, MousePointer2, X, Link as LinkIcon
+import { TransformComponent, TransformWrapper, type ReactZoomPanPinchContentRef } from 'react-zoom-pan-pinch';
+import {
+  Activity,
+  Bot,
+  Code,
+  Image,
+  Link,
+  Link as LinkIcon,
+  MoreHorizontal,
+  MousePointer2,
+  Move,
+  PenTool,
+  Plus,
+  Type,
+  X,
 } from 'lucide-react';
+import { NoteCard } from './NoteCard';
+import type { RoomParticipant } from '../../utils/collaboration';
 
-// === 接口定义 ===
 interface BoardItem {
-  id: string; 
-  type: 'text' | 'image' | 'status' | 'video' | 'audio' | 'link' | 'code' | 'ai' | 'note';
-  content: string; 
-  x: number; 
+  id: string;
+  type: 'text' | 'image' | 'status' | 'video' | 'audio' | 'link' | 'code' | 'ai' | 'note' | 'drawing';
+  content: string;
+  x: number;
   y: number;
-  width?: number; 
-  height?: number; 
+  width?: number;
+  height?: number;
 }
 
 interface Connection {
-  id: string; start: string; end: string;
+  id: string;
+  start: string;
+  end: string;
 }
 
 interface BrainstormBoardProps {
   initialItems?: BoardItem[];
   initialConnections?: Connection[];
   onDataChange?: (items: BoardItem[], connections: Connection[]) => void;
+  participants?: RoomParticipant[];
+  selfConnectionId?: string | null;
+  isConnected?: boolean;
+  onPresenceChange?: (status: string, focusedItemId?: string | null) => void;
+  onActivity?: (activity: { kind: string; message: string; itemId?: string | null; focusedItemId?: string | null; status?: string }) => void;
 }
 
-export function BrainstormBoard({ initialItems = [], initialConnections = [], onDataChange }: BrainstormBoardProps) {
-  // === 状态管理 ===
+type TransformState = {
+  scale: number;
+  positionX: number;
+  positionY: number;
+};
+
+function getItemDefaults(type: BoardItem['type']) {
+  switch (type) {
+    case 'text':
+      return { width: 200, height: 150 };
+    case 'ai':
+      return { width: 300, height: 400 };
+    case 'code':
+      return { width: 400, height: 300 };
+    case 'image':
+      return { width: 300, height: 200 };
+    case 'drawing':
+      return { width: 360, height: 280 };
+    case 'status':
+      return { width: 160, height: 50 };
+    case 'audio':
+      return { width: 320, height: 96 };
+    default:
+      return { width: 250, height: 160 };
+  }
+}
+
+export function BrainstormBoard({
+  initialItems = [],
+  initialConnections = [],
+  onDataChange,
+  participants = [],
+  selfConnectionId = null,
+  isConnected = false,
+  onPresenceChange,
+  onActivity,
+}: BrainstormBoardProps) {
   const [items, setItems] = useState<BoardItem[]>(initialItems);
   const [connections, setConnections] = useState<Connection[]>(initialConnections);
-  
-  // 核心交互模式：'pan'=浏览画布, 'edit'=移动卡片, 'connect'=建立连线
   const [mode, setMode] = useState<'pan' | 'edit' | 'connect'>('pan');
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // Refs
+
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const captureRef = useRef<HTMLDivElement>(null); 
+  const captureRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
-  
-  const updateXarrow = useXarrow(); 
 
-  // === 初始化与数据同步 ===
+  const updateXarrow = useXarrow();
+
   useEffect(() => {
     if (!hasInitialized.current) {
-      if (initialItems.length > 0) setItems(initialItems);
-      if (initialConnections.length > 0) setConnections(initialConnections);
+      setItems(initialItems);
+      setConnections(initialConnections);
       hasInitialized.current = true;
     }
   }, [initialItems, initialConnections]);
 
   useEffect(() => {
-    if (onDataChange) onDataChange(items, connections);
+    onDataChange?.(items, connections);
   }, [items, connections, onDataChange]);
 
-  // 视图变化时刷新连线
-  const handleTransform = useCallback(() => {
-     updateXarrow();
-  }, [updateXarrow]);
+  const syncXarrowTransformVars = useCallback((state?: TransformState) => {
+    const captureEl = captureRef.current;
+    const transformState = state ?? transformComponentRef.current?.instance.transformState;
+    if (!captureEl || !transformState) return;
 
-  // === 核心逻辑 ===
+    const inverseScale = transformState.scale ? 1 / transformState.scale : 1;
+    captureEl.style.setProperty('--xarrow-inv-scale', `${inverseScale}`);
+    captureEl.style.setProperty('--xarrow-inv-tx', `${-transformState.positionX}px`);
+    captureEl.style.setProperty('--xarrow-inv-ty', `${-transformState.positionY}px`);
+  }, []);
 
-  // 获取当前视口中心坐标（用于添加新物品）
+  const handleTransform = useCallback((_ref: unknown, state?: TransformState) => {
+    syncXarrowTransformVars(state);
+    updateXarrow();
+  }, [syncXarrowTransformVars, updateXarrow]);
+
+  const otherEditors = participants.filter(
+    (participant) => participant.connectionId !== selfConnectionId && participant.presence.activeModule === 'brainstorm',
+  );
+
+  const getItemWatchers = (itemId: string) => otherEditors.filter((participant) => participant.presence.focusedItemId === itemId);
+
   const getCenterCoords = () => {
-    if (transformComponentRef.current) {
-        const { transformState } = transformComponentRef.current.instance;
-        const centerX = (window.innerWidth / 2 - transformState.positionX) / transformState.scale;
-        const centerY = (window.innerHeight / 2 - transformState.positionY) / transformState.scale;
-        return { x: centerX - 100, y: centerY - 60 };
+    if (!transformComponentRef.current) {
+      return { x: 100, y: 100 };
     }
-    return { x: 100, y: 100 };
+
+    const { transformState } = transformComponentRef.current.instance;
+    const centerX = (window.innerWidth / 2 - transformState.positionX) / transformState.scale;
+    const centerY = (window.innerHeight / 2 - transformState.positionY) / transformState.scale;
+    return { x: centerX - 100, y: centerY - 60 };
   };
 
-  // 添加物品
   const addItem = (type: BoardItem['type'], defaultContent = '') => {
     const { x, y } = getCenterCoords();
-    let defaultW = 250;
-    let defaultH = 160;
+    const size = getItemDefaults(type);
 
-    switch(type) {
-        case 'text': defaultW = 200; defaultH = 150; break;
-        case 'ai': defaultW = 300; defaultH = 400; break;
-        case 'code': defaultW = 400; defaultH = 300; break;
-        case 'image': defaultW = 300; defaultH = 200; break;
-        case 'status': defaultW = 160; defaultH = 50; break;
-    }
-
-    setItems(prev => [...prev, { id: uuidv4(), type, content: defaultContent, x, y, width: defaultW, height: defaultH }]);
+    setItems((prev) => [...prev, { id: uuidv4(), type, content: defaultContent, x, y, width: size.width, height: size.height }]);
     setIsMenuOpen(false);
-    setMode('edit'); // 添加后自动切到编辑模式，方便调整
+    setMode('edit');
+    onActivity?.({
+      kind: 'brainstorm:add',
+      message: `新增了一个${type === 'text' ? '文本' : type === 'ai' ? 'AI' : type === 'drawing' ? '绘图' : type}磁贴`,
+      status: '正在新增磁贴',
+    });
   };
 
-  // 处理卡片点击（核心连线逻辑）
-  const handleItemClick = (id: string, e: React.MouseEvent | React.TouchEvent) => {
-    if (mode === 'connect') {
-      e.stopPropagation(); // 阻止冒泡，防止触发背景点击
-      
-      if (!connectSourceId) {
-        // 第一步：选中起点
-        setConnectSourceId(id);
-      } else {
-        // 第二步：选中终点
-        if (connectSourceId !== id) {
-           const exists = connections.some(c => c.start === connectSourceId && c.end === id);
-           if (!exists) {
-              const newConn = { id: uuidv4(), start: connectSourceId, end: id };
-              setConnections(prev => [...prev, newConn]);
-           }
-        }
-        // 连线完成后，重置起点，保持在连线模式以便继续连接，或者切回 pan
-        setConnectSourceId(null); 
+  const handleItemClick = (id: string, event: React.MouseEvent | React.TouchEvent) => {
+    if (isConnected) {
+      onPresenceChange?.('正在查看磁贴', id);
+    }
+
+    if (mode !== 'connect') return;
+
+    event.stopPropagation();
+
+    if (!connectSourceId) {
+      setConnectSourceId(id);
+      return;
+    }
+
+    if (connectSourceId !== id) {
+      const exists = connections.some((connection) => connection.start === connectSourceId && connection.end === id);
+      if (!exists) {
+        setConnections((prev) => [...prev, { id: uuidv4(), start: connectSourceId, end: id }]);
+        onActivity?.({
+          kind: 'brainstorm:connect',
+          itemId: id,
+          focusedItemId: id,
+          message: '连接了两张磁贴',
+          status: '正在连接磁贴',
+        });
       }
     }
+
+    setConnectSourceId(null);
   };
 
-  // 处理文件拖入
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    const files = Array.from(e.dataTransfer.files);
-    const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/') || f.type.startsWith('audio/'));
-    
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const mediaFiles = Array.from(event.dataTransfer.files).filter(
+      (file) => file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/'),
+    );
+
     if (mediaFiles.length === 0) return;
-    
-    let canvasX = 0, canvasY = 0;
+
+    let canvasX = 0;
+    let canvasY = 0;
     if (transformComponentRef.current) {
-        const { transformState } = transformComponentRef.current.instance;
-        canvasX = (e.clientX - transformState.positionX) / transformState.scale;
-        canvasY = (e.clientY - transformState.positionY) / transformState.scale;
+      const { transformState } = transformComponentRef.current.instance;
+      canvasX = (event.clientX - transformState.positionX) / transformState.scale;
+      canvasY = (event.clientY - transformState.positionY) / transformState.scale;
     }
 
     mediaFiles.forEach((file, index) => {
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        let type: any = 'image'; if (file.type.startsWith('video/')) type = 'video'; if (file.type.startsWith('audio/')) type = 'audio';
-        setItems(prev => [...prev, { 
-            id: uuidv4(), type, content: ev.target?.result as string, 
-            x: canvasX + index * 20 - 150, y: canvasY + index * 20 - 100,
-            width: 300, height: 'auto' as any 
+      reader.onload = (readerEvent) => {
+        const type = file.type.startsWith('video/')
+          ? 'video'
+          : file.type.startsWith('audio/')
+            ? 'audio'
+            : 'image';
+        const size = getItemDefaults(type);
+        setItems((prev) => [...prev, {
+          id: uuidv4(),
+          type,
+          content: readerEvent.target?.result as string,
+          x: canvasX + index * 20 - 150,
+          y: canvasY + index * 20 - 100,
+          width: size.width,
+          height: size.height,
         }]);
       };
       reader.readAsDataURL(file);
     });
   };
 
-  // 处理文件选择按钮
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        let type: any = 'image'; if (file.type.startsWith('video/')) type = 'video'; if (file.type.startsWith('audio/')) type = 'audio';
-        const { x, y } = getCenterCoords();
-        setItems(prev => [...prev, { id: uuidv4(), type, content: ev.target?.result as string, x, y, width: 300, height: 200 }]);
-      };
-      reader.readAsDataURL(file);
-    }
-    e.target.value = ''; 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const type = file.type.startsWith('video/')
+        ? 'video'
+        : file.type.startsWith('audio/')
+          ? 'audio'
+          : 'image';
+      const { x, y } = getCenterCoords();
+      const size = getItemDefaults(type);
+      setItems((prev) => [...prev, {
+        id: uuidv4(),
+        type,
+        content: readerEvent.target?.result as string,
+        x,
+        y,
+        width: size.width,
+        height: size.height,
+      }]);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
   };
 
-  // 导出图片
   const exportAsImage = async () => {
     if (!captureRef.current || !transformComponentRef.current) return;
     setIsMenuOpen(false);
-    
-    const { instance } = transformComponentRef.current;
-    const { setTransform } = transformComponentRef.current;
-    
+
+    const { instance, setTransform } = transformComponentRef.current;
     const originalX = instance.transformState.positionX;
     const originalY = instance.transformState.positionY;
     const originalScale = instance.transformState.scale;
 
     try {
-      setTransform(0, 0, 1, 0); // 重置为 1:1 截取全图
-      
-      setTimeout(async () => {
-        updateXarrow(); 
-        if (captureRef.current) {
-          const dataUrl = await toPng(captureRef.current, { 
-              backgroundColor: '#0f172a', 
-              pixelRatio: 2, 
-              filter: (node) => !node.classList?.contains('drag-handle-ignored') 
-          });
-          const link = document.createElement('a'); 
-          link.download = `GP_Board_${Date.now()}.png`; 
-          link.href = dataUrl; 
-          link.click();
-        }
+      setTransform(0, 0, 1, 0);
+      syncXarrowTransformVars({ scale: 1, positionX: 0, positionY: 0 });
+
+      window.setTimeout(async () => {
+        updateXarrow();
+        if (!captureRef.current) return;
+
+        const dataUrl = await toPng(captureRef.current, {
+          backgroundColor: '#0f172a',
+          pixelRatio: 2,
+          filter: (node) => !node.classList?.contains('drag-handle-ignored'),
+        });
+
+        const link = document.createElement('a');
+        link.download = `GP_Board_${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+
         setTransform(originalX, originalY, originalScale, 0);
-      }, 500);
-    } catch (error) { 
-        console.error("Export failed:", error); 
-        setTransform(originalX, originalY, originalScale, 0);
+        syncXarrowTransformVars({ scale: originalScale, positionX: originalX, positionY: originalY });
+      }, 350);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setTransform(originalX, originalY, originalScale, 0);
+      syncXarrowTransformVars({ scale: originalScale, positionX: originalX, positionY: originalY });
     }
   };
 
-  const deleteConnection = (connId: string) => setConnections(prev => prev.filter(c => c.id !== connId));
-
-  const getAIInputs = (aiId: string) => {
-    const incomingConns = connections.filter(c => c.end === aiId);
-    const sourceItems = incomingConns.map(c => items.find(i => i.id === c.start)).filter(Boolean) as BoardItem[];
-    return sourceItems
-        .filter(i => (i.type === 'text' || i.type === 'code' || i.type === 'ai') && i.content.trim().length > 0)
-        .map(i => i.content);
+  const deleteConnection = (connectionId: string) => {
+    setConnections((prev) => prev.filter((connection) => connection.id !== connectionId));
+    onActivity?.({
+      kind: 'brainstorm:disconnect',
+      message: '删除了一条磁贴连接',
+      status: '刚删除一条连接',
+    });
   };
 
-  // 进入连线模式
+  const getAIInputs = (aiId: string) => {
+    const incomingConnections = connections.filter((connection) => connection.end === aiId);
+    const sourceItems = incomingConnections
+      .map((connection) => items.find((item) => item.id === connection.start))
+      .filter(Boolean) as BoardItem[];
+
+    return sourceItems
+      .filter((item) => (item.type === 'text' || item.type === 'code' || item.type === 'ai') && item.content.trim().length > 0)
+      .map((item) => item.content);
+  };
+
   const enterConnectMode = () => {
-      setConnectSourceId(null);
-      setMode('connect');
-      setIsMenuOpen(false);
+    setConnectSourceId(null);
+    setMode('connect');
+    setIsMenuOpen(false);
+    onPresenceChange?.('准备连接磁贴', null);
   };
 
   return (
-    <div className="absolute inset-0 bg-slate-900 overflow-hidden select-none">
-      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,audio/*"/>
+    <div className="absolute inset-0 overflow-hidden bg-slate-900 select-none">
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,audio/*" />
 
-      {/* === 顶部提示栏 (连线模式下显示) === */}
       {mode === 'connect' && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 pointer-events-auto">
-             <div className="bg-emerald-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-3">
-                <LinkIcon size={16} />
-                <span className="text-sm font-bold">
-                    {connectSourceId ? '请点击另一个卡片完成连线' : '请点击起点卡片'}
-                </span>
-                <button onClick={() => { setMode('pan'); setConnectSourceId(null); }} className="bg-black/20 hover:bg-black/40 rounded-full p-1 transition-colors">
-                    <X size={14} />
-                </button>
-             </div>
+        <div className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-3 rounded-full bg-emerald-600 px-4 py-2 text-white shadow-lg">
+            <LinkIcon size={16} />
+            <span className="text-sm font-bold">
+              {connectSourceId ? '请点击另一张卡片完成连接' : '请点击起点卡片'}
+            </span>
+            <button onClick={() => { setMode('pan'); setConnectSourceId(null); }} className="rounded-full bg-black/20 p-1 transition-colors hover:bg-black/40">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isConnected && otherEditors.length > 0 && (
+        <div className="pointer-events-none absolute right-4 top-4 z-[120] max-w-xs space-y-2">
+          {otherEditors.slice(0, 4).map((participant) => (
+            <div key={participant.connectionId} className="rounded-xl border border-slate-700 bg-slate-800/95 px-3 py-2 shadow-xl backdrop-blur">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: participant.color }} />
+                {participant.name}
+              </div>
+              <div className="mt-1 text-xs text-slate-300">{participant.presence.status || '正在白板中协作'}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -244,157 +359,218 @@ export function BrainstormBoard({ initialItems = [], initialConnections = [], on
         minScale={0.1}
         maxScale={5}
         centerOnInit
-        disabled={mode !== 'pan'} // 只有 Pan 模式下允许拖拽画布
+        disabled={mode !== 'pan'}
         limitToBounds={false}
-        onTransformed={handleTransform} 
-        doubleClick={{ disabled: true }} 
+        onTransformed={handleTransform}
+        onInit={(ref) => {
+          syncXarrowTransformVars(ref.state);
+          updateXarrow();
+        }}
+        doubleClick={{ disabled: true }}
       >
-        {({ }) => (
-          <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%" }}>
-            <div 
-                ref={captureRef}
-                className="relative w-[4000px] h-[4000px] bg-slate-900" 
-                style={{ 
-                   backgroundImage: 'radial-gradient(#334155 1px, transparent 1px)', 
-                   backgroundSize: '40px 40px' 
-                }}
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                // 点击空白处：如果是连线模式则取消选中，如果是编辑模式则切回浏览
-                onClick={() => {
-                   if (mode === 'connect') setConnectSourceId(null);
-                }}
-            >
-              <Xwrapper>
-                 {items.map(item => (
-                    // ⚠️ 关键修正：外层 div 强制 left:0, top:0
-                    <div 
-                        key={item.id} 
-                        style={{ position: 'absolute', left: 0, top: 0 }} 
-                        // 处理点击事件（连线逻辑）
-                        onClick={(e) => handleItemClick(item.id, e)}
-                        className={`${mode === 'connect' ? 'cursor-pointer' : ''}`}
-                    >
-                      <NoteCard 
-                        {...item}
-                        // 传递 scale 修正拖拽灵敏度
-                        scale={transformComponentRef.current?.instance.transformState.scale || 1}
-                        // 禁用拖拽的条件：Pan模式(防误触) OR Connect模式(防移动)
-                        disabled={mode === 'pan' || mode === 'connect'} 
-                        // 高亮状态：如果是连线起点，或者被选中
-                        isSelected={connectSourceId === item.id}
-                        
-                        inputs={item.type === 'ai' ? getAIInputs(item.id) : undefined}
-                        onUpdate={(id, txt) => setItems(prev => prev.map(n => n.id === id ? {...n, content: txt} : n))}
-                        onResize={(id, w, h) => {
-                            setItems(prev => prev.map(n => n.id === id ? { ...n, width: w, height: h } : n));
-                            updateXarrow();
-                        }}
-                        onDelete={(id) => { setItems(prev => prev.filter(n => n.id !== id)); setConnections(prev => prev.filter(c => c.start !== id && c.end !== id)); }}
-                        onDrag={(id, x, y) => { 
-                            setItems(prev => prev.map(n => n.id === id ? { ...n, x, y } : n)); 
-                            updateXarrow(); 
-                        }}
-                        // 兼容 NoteCard 内部的小圆点连线（如果 NoteCard 还保留了的话）
-                        onConnectStart={() => {}}
-                        onConnectEnd={() => {}}
-                      />
-                      
-                      {/* 连线模式下的遮罩层 (增强点击区域) */}
-                      {mode === 'connect' && (
-                          <div className={`absolute inset-0 rounded-lg transition-all duration-300 z-50 ${
-                              connectSourceId === item.id 
-                                ? 'ring-4 ring-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]' 
-                                : 'hover:bg-emerald-500/10 hover:ring-2 hover:ring-emerald-400'
-                          }`} />
-                      )}
+        <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%' }}>
+          <div
+            ref={captureRef}
+            className="relative h-[4000px] w-[4000px] bg-slate-900"
+            style={{
+              backgroundImage: 'radial-gradient(#334155 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+              ['--xarrow-inv-scale' as any]: 1,
+              ['--xarrow-inv-tx' as any]: '0px',
+              ['--xarrow-inv-ty' as any]: '0px',
+            }}
+            onDrop={handleDrop}
+            onDragOver={(event) => event.preventDefault()}
+            onClick={() => {
+              if (mode === 'connect') setConnectSourceId(null);
+              if (isConnected) onPresenceChange?.('正在浏览白板', null);
+            }}
+          >
+            <Xwrapper>
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  style={{ position: 'absolute', left: 0, top: 0 }}
+                  onClick={(event) => handleItemClick(item.id, event)}
+                  className={mode === 'connect' ? 'cursor-pointer' : ''}
+                >
+                  {getItemWatchers(item.id).length > 0 && (
+                    <div className="pointer-events-none absolute -top-10 left-0 z-[120] flex flex-wrap gap-2">
+                      {getItemWatchers(item.id).slice(0, 3).map((participant) => (
+                        <div
+                          key={participant.connectionId}
+                          className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold text-white shadow-lg"
+                          style={{ backgroundColor: participant.color }}
+                        >
+                          {participant.name} 正在看这里
+                        </div>
+                      ))}
                     </div>
-                 ))}
+                  )}
 
-                 {connections.map(conn => (
-                    <Xarrow
-                      key={conn.id} start={conn.start} end={conn.end} color="#10b981" strokeWidth={3} headSize={6} path="smooth" zIndex={10} 
-                      labels={{ middle: ( 
-                         <div 
-                           onClick={(e) => { e.stopPropagation(); deleteConnection(conn.id); }} 
-                           className={`pointer-events-auto cursor-pointer p-1 rounded-full bg-slate-800 border border-slate-600 hover:bg-red-500 hover:border-red-500 hover:text-white text-slate-400 transition-colors z-[999] ${mode === 'pan' ? 'hidden' : ''}`} 
-                           title="删除连线"
-                         >
-                            <X size={12} />
-                         </div> 
-                      ) }}
+                  <NoteCard
+                    {...item}
+                    scale={transformComponentRef.current?.instance.transformState.scale || 1}
+                    disabled={mode === 'pan' || mode === 'connect'}
+                    isSelected={connectSourceId === item.id}
+                    inputs={item.type === 'ai' ? getAIInputs(item.id) : undefined}
+                    onUpdate={(id, text) => {
+                      setItems((prev) => prev.map((entry) => (entry.id === id ? { ...entry, content: text } : entry)));
+                      onPresenceChange?.('正在编辑磁贴', id);
+                    }}
+                    onResize={(id, width, height) => {
+                      setItems((prev) => prev.map((entry) => (entry.id === id ? { ...entry, width, height } : entry)));
+                      updateXarrow();
+                      onPresenceChange?.('正在调整磁贴大小', id);
+                    }}
+                    onDelete={(id) => {
+                      setItems((prev) => prev.filter((entry) => entry.id !== id));
+                      setConnections((prev) => prev.filter((connection) => connection.start !== id && connection.end !== id));
+                      onActivity?.({
+                        kind: 'brainstorm:delete',
+                        itemId: id,
+                        message: '删除了一张磁贴',
+                        status: '刚删除一张磁贴',
+                      });
+                    }}
+                    onDrag={(id, x, y) => {
+                      setItems((prev) => prev.map((entry) => (entry.id === id ? { ...entry, x, y } : entry)));
+                      updateXarrow();
+                      onPresenceChange?.('正在移动磁贴', id);
+                    }}
+                    onConnectStart={() => {}}
+                    onConnectEnd={() => {}}
+                  />
+
+                  {mode === 'connect' && (
+                    <div
+                      className={`absolute inset-0 z-50 rounded-lg transition-all duration-300 ${
+                        connectSourceId === item.id
+                          ? 'ring-4 ring-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                          : 'hover:bg-emerald-500/10 hover:ring-2 hover:ring-emerald-400'
+                      }`}
                     />
-                  ))}
-              </Xwrapper>
-            </div>
-          </TransformComponent>
-        )}
+                  )}
+                </div>
+              ))}
+
+              {connections.map((connection) => (
+                <Xarrow
+                  key={connection.id}
+                  start={connection.start}
+                  end={connection.end}
+                  color="#10b981"
+                  strokeWidth={3}
+                  headSize={6}
+                  path="smooth"
+                  zIndex={10}
+                  divContainerStyle={{
+                    transform: 'scale(var(--xarrow-inv-scale, 1)) translate(var(--xarrow-inv-tx, 0px), var(--xarrow-inv-ty, 0px))',
+                    transformOrigin: '0 0',
+                  }}
+                  labels={{
+                    middle: (
+                      <div
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteConnection(connection.id);
+                        }}
+                        className={`pointer-events-auto z-[999] cursor-pointer rounded-full border border-slate-600 bg-slate-800 p-1 text-slate-400 transition-colors hover:border-red-500 hover:bg-red-500 hover:text-white ${mode === 'pan' ? 'hidden' : ''}`}
+                        title="删除连线"
+                      >
+                        <X size={12} />
+                      </div>
+                    ),
+                  }}
+                />
+              ))}
+            </Xwrapper>
+          </div>
+        </TransformComponent>
       </TransformWrapper>
 
-      {/* === 右下角控制区 === */}
-      <div className="absolute bottom-20 md:bottom-8 right-4 md:right-8 flex items-end gap-4 z-[100] pointer-events-none">
-        
-        {/* 模式切换器 */}
-        <div className="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-full px-2 py-1 flex gap-2 shadow-xl pointer-events-auto mb-1">
-             <button 
-               onClick={() => { setMode('pan'); setConnectSourceId(null); }} 
-               className={`p-2 rounded-full transition-colors ${mode === 'pan' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-               title="浏览模式 (移动画布)"
-             >
-               <Move size={20} />
-             </button>
-             <div className="w-px h-6 bg-slate-600 self-center opacity-50"></div>
-             <button 
-               onClick={() => { setMode('edit'); setConnectSourceId(null); }}
-               className={`p-2 rounded-full transition-colors ${mode === 'edit' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-               title="编辑模式 (移动卡片)"
-             >
-               <MousePointer2 size={20} />
-             </button>
-             <button 
-               onClick={enterConnectMode}
-               className={`p-2 rounded-full transition-colors ${mode === 'connect' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-               title="连线模式"
-             >
-               <LinkIcon size={20} />
-             </button>
+      <div className="pointer-events-none absolute bottom-20 right-4 z-[100] flex items-end gap-4 md:bottom-8 md:right-8">
+        <div className="mb-1 flex gap-2 rounded-full border border-slate-700 bg-slate-800/90 px-2 py-1 shadow-xl backdrop-blur pointer-events-auto">
+          <button
+            onClick={() => {
+              setMode('pan');
+              setConnectSourceId(null);
+              onPresenceChange?.('正在浏览白板', null);
+            }}
+            className={`rounded-full p-2 transition-colors ${mode === 'pan' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            title="浏览模式"
+          >
+            <Move size={20} />
+          </button>
+          <div className="h-6 w-px self-center bg-slate-600 opacity-50" />
+          <button
+            onClick={() => {
+              setMode('edit');
+              setConnectSourceId(null);
+              onPresenceChange?.('正在编辑白板', null);
+            }}
+            className={`rounded-full p-2 transition-colors ${mode === 'edit' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            title="编辑模式"
+          >
+            <MousePointer2 size={20} />
+          </button>
+          <button
+            onClick={enterConnectMode}
+            className={`rounded-full p-2 transition-colors ${mode === 'connect' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            title="连线模式"
+          >
+            <LinkIcon size={20} />
+          </button>
         </div>
 
-        {/* 添加菜单 */}
-        <div className="flex flex-col items-end gap-4 pointer-events-auto">
-            <div className={`flex flex-col gap-3 transition-all duration-300 origin-bottom ${isMenuOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-0 pointer-events-none'}`}>
-              <div className="flex gap-2">
-                <button onClick={exportAsImage} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-lg" title="导出图片"><Image size={18} /></button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg" title="上传文件"><MoreHorizontal size={18} /></button>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => addItem('video')} className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg" title="视频"><Video size={18} /></button>
-                <button onClick={() => addItem('audio')} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-full shadow-lg" title="音频"><Music size={18} /></button>
-              </div>
-              <div className="flex gap-2">
-                 <button onClick={() => addItem('code')} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full shadow-lg" title="代码"><Code size={18} /></button>
-                 <button onClick={() => addItem('link')} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-full shadow-lg" title="网页"><Link size={18} /></button>
-              </div>
-              <div className="flex gap-2">
-                 <button onClick={() => addItem('status', 'unused')} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-full shadow-lg" title="状态"><Activity size={18} /></button>
-                 <button onClick={() => addItem('text')} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-white rounded-full shadow-lg" title="贴纸"><Type size={18} /></button>
-                 <button onClick={() => addItem('ai')} className="flex items-center gap-2 px-4 py-2 bg-purple-800 hover:bg-purple-700 text-white rounded-full shadow-lg border border-purple-500" title="AI 助手"><Bot size={18} /></button>
-              </div>
+        <div className="pointer-events-auto flex flex-col items-end gap-4">
+          <div className={`origin-bottom flex flex-col gap-3 transition-all duration-300 ${isMenuOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-0 opacity-0'}`}>
+            <div className="flex gap-2">
+              <button onClick={exportAsImage} className="rounded-full bg-blue-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-blue-500" title="导出图片">
+                <Image size={18} />
+              </button>
+              <button onClick={() => fileInputRef.current?.click()} className="rounded-full bg-indigo-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-indigo-500" title="上传文件">
+                <MoreHorizontal size={18} />
+              </button>
             </div>
-            <button 
-               onClick={() => setIsMenuOpen(!isMenuOpen)} 
-               className={`w-14 h-14 md:w-16 md:h-16 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full shadow-2xl flex items-center justify-center transition-transform duration-300 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}
-            >
-                <Plus size={32} />
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => addItem('drawing')} className="rounded-full bg-amber-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-amber-500" title="绘图">
+                <PenTool size={18} />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => addItem('code')} className="rounded-full bg-slate-700 px-4 py-2 text-white shadow-lg transition-colors hover:bg-slate-600" title="代码">
+                <Code size={18} />
+              </button>
+              <button onClick={() => addItem('link')} className="rounded-full bg-sky-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-sky-500" title="网页">
+                <Link size={18} />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => addItem('status', 'unused')} className="rounded-full bg-purple-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-purple-500" title="状态">
+                <Activity size={18} />
+              </button>
+              <button onClick={() => addItem('text')} className="rounded-full bg-yellow-500 px-4 py-2 text-white shadow-lg transition-colors hover:bg-yellow-400" title="便签">
+                <Type size={18} />
+              </button>
+              <button onClick={() => addItem('ai')} className="rounded-full border border-purple-500 bg-purple-800 px-4 py-2 text-white shadow-lg transition-colors hover:bg-purple-700" title="AI 助手">
+                <Bot size={18} />
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-2xl transition-transform duration-300 hover:bg-emerald-400 md:h-16 md:w-16 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}
+          >
+            <Plus size={32} />
+          </button>
         </div>
       </div>
-      
-      {/* 底部状态提示 */}
-      <div className="absolute bottom-4 left-4 text-slate-500 text-xs pointer-events-none opacity-50 hidden md:block">
-         {mode === 'pan' && '当前: 浏览模式 (可拖拽/缩放画布)'}
-         {mode === 'edit' && '当前: 编辑模式 (可移动/调整卡片)'}
-         {mode === 'connect' && '当前: 连线模式 (点击两个卡片进行连接)'}
+
+      <div className="pointer-events-none absolute bottom-4 left-4 hidden text-xs text-slate-500 opacity-50 md:block">
+        {mode === 'pan' && '当前: 浏览模式 (拖动画布 / 缩放白板)'}
+        {mode === 'edit' && '当前: 编辑模式 (移动卡片 / 调整尺寸)'}
+        {mode === 'connect' && '当前: 连线模式 (点击两张卡片建立连接)'}
       </div>
     </div>
   );

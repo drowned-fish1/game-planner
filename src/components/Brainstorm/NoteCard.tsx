@@ -9,7 +9,7 @@ const STORAGE_KEY_ACTIVE = 'gp_ai_active_id';
 
 interface NoteCardProps {
   id: string;
-  type: 'text' | 'image' | 'status' | 'video' | 'audio' | 'link' | 'code' | 'ai' | 'note';
+  type: 'text' | 'image' | 'status' | 'video' | 'audio' | 'link' | 'code' | 'ai' | 'note' | 'drawing';
   content: string; 
   x: number;
   y: number;
@@ -37,6 +37,236 @@ const STATUS_TYPES = {
 };
 
 type StatusKey = keyof typeof STATUS_TYPES;
+
+const DRAWING_BACKGROUND = '#ffffff';
+const DRAWING_COLOR = '#0f172a';
+const DRAWING_SIZES = [
+  { label: '\u7ec6', value: 2 },
+  { label: '\u4e2d', value: 4 },
+  { label: '\u7c97', value: 8 },
+];
+
+interface DrawingCardContentProps {
+  content: string;
+  width: number;
+  height: number;
+  onChange: (next: string) => void;
+}
+
+function DrawingCardContent({ content, width, height, onChange }: DrawingCardContentProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const [surfaceSize, setSurfaceSize] = useState({ width: Math.max(width, 120), height: Math.max(height - 44, 120) });
+  const [brushSize, setBrushSize] = useState(4);
+  const [isEraser, setIsEraser] = useState(false);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const updateSize = () => {
+      const nextWidth = Math.max(Math.floor(wrapper.clientWidth), 1);
+      const nextHeight = Math.max(Math.floor(wrapper.clientHeight), 1);
+      setSurfaceSize(prev => (
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      ));
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [width, height]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(Math.floor(surfaceSize.width * dpr), 1);
+    canvas.height = Math.max(Math.floor(surfaceSize.height * dpr), 1);
+    canvas.style.width = `${surfaceSize.width}px`;
+    canvas.style.height = `${surfaceSize.height}px`;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, surfaceSize.width, surfaceSize.height);
+    ctx.fillStyle = DRAWING_BACKGROUND;
+    ctx.fillRect(0, 0, surfaceSize.width, surfaceSize.height);
+
+    if (!content) return;
+
+    let disposed = false;
+    const image = new Image();
+    image.onload = () => {
+      if (disposed) return;
+      ctx.drawImage(image, 0, 0, surfaceSize.width, surfaceSize.height);
+    };
+    image.src = content;
+
+    return () => {
+      disposed = true;
+    };
+  }, [content, surfaceSize]);
+
+  const stopProp = (e: React.PointerEvent | React.MouseEvent | React.TouchEvent) => e.stopPropagation();
+
+  const getPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const scaleX = rect.width ? surfaceSize.width / rect.width : 1;
+    const scaleY = rect.height ? surfaceSize.height / rect.height : 1;
+
+    return {
+      x: (event.clientX - rect.left) * scaleX,
+      y: (event.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const drawSegment = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const strokeColor = isEraser ? DRAWING_BACKGROUND : DRAWING_COLOR;
+
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.strokeStyle = strokeColor;
+    ctx.fillStyle = strokeColor;
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+
+    if (from.x === to.x && from.y === to.y) {
+      ctx.beginPath();
+      ctx.arc(to.x, to.y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  };
+
+  const commitDrawing = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    onChange(canvas.toDataURL('image/png'));
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    stopProp(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = getPoint(event);
+    isDrawingRef.current = true;
+    lastPointRef.current = point;
+    drawSegment(point, point);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    stopProp(event);
+    if (!isDrawingRef.current || !lastPointRef.current) return;
+
+    const nextPoint = getPoint(event);
+    drawSegment(lastPointRef.current, nextPoint);
+    lastPointRef.current = nextPoint;
+  };
+
+  const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    stopProp(event);
+    if (!isDrawingRef.current) return;
+
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    commitDrawing();
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, surfaceSize.width, surfaceSize.height);
+    ctx.fillStyle = DRAWING_BACKGROUND;
+    ctx.fillRect(0, 0, surfaceSize.width, surfaceSize.height);
+    ctx.restore();
+    commitDrawing();
+  };
+
+  return (
+    <div className="flex h-full flex-col bg-slate-100" onPointerDown={stopProp}>
+      <div className="flex items-center gap-1 border-b border-slate-200 bg-white/95 px-2 py-1.5">
+        {DRAWING_SIZES.map(size => (
+          <button
+            key={size.value}
+            type="button"
+            onClick={() => {
+              setBrushSize(size.value);
+              setIsEraser(false);
+            }}
+            className={`min-w-8 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+              !isEraser && brushSize === size.value
+                ? 'bg-emerald-500 text-white'
+                : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+            }`}
+          >
+            {size.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setIsEraser(prev => !prev)}
+          className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+            isEraser
+              ? 'bg-rose-500 text-white'
+              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+          }`}
+        >
+          {'\u6a61\u76ae'}
+        </button>
+        <button
+          type="button"
+          onClick={clearCanvas}
+          className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900"
+        >
+          {'\u6e05\u7a7a'}
+        </button>
+      </div>
+      <div ref={wrapperRef} className="relative min-h-0 flex-1 bg-white">
+        <canvas
+          ref={canvasRef}
+          className="block h-full w-full touch-none cursor-crosshair bg-white"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishDrawing}
+          onPointerCancel={finishDrawing}
+          onPointerLeave={finishDrawing}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function NoteCard({ 
   id, type, content, x, y, width, height, scale, isSelected, inputs = [], disabled, // 2. 解构 disabled
@@ -174,6 +404,36 @@ export function NoteCard({
     }
     
     if (type === 'image') return <img src={content} className="w-full h-full object-cover pointer-events-none block rounded-lg select-none" alt="" />;
+
+    if (type === 'video') {
+      return (
+        <video
+          src={content}
+          className="w-full h-full object-contain block rounded-lg bg-black"
+          controls
+          onPointerDown={stopProp}
+        />
+      );
+    }
+
+    if (type === 'audio') {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-black/60 rounded-lg" onPointerDown={stopProp}>
+          <audio src={content} controls className="w-[90%]" />
+        </div>
+      );
+    }
+
+    if (type === 'drawing') {
+      return (
+        <DrawingCardContent
+          content={content}
+          width={currentW}
+          height={currentH}
+          onChange={(next) => onUpdate(id, next)}
+        />
+      );
+    }
     
     return (
         <textarea 
@@ -195,6 +455,8 @@ export function NoteCard({
   if (type === 'ai') bgClass = "bg-slate-900 border-2 border-purple-500/50";
   else if (type === 'code') bgClass = "bg-[#1e1e1e] border border-slate-700";
   else if (type === 'image' || type === 'status') bgClass = "bg-transparent"; 
+  else if (type === 'video' || type === 'audio') bgClass = "bg-slate-900 border border-slate-700";
+  else if (type === 'drawing') bgClass = "bg-slate-100 border border-slate-300";
 
   const handleStyle = "w-6 h-6 bg-white border-2 border-slate-400 hover:bg-emerald-500 rounded-full absolute z-[100] shadow-sm flex items-center justify-center touch-none";
   const handleTouchEvents = (id: string) => ({
@@ -226,10 +488,10 @@ export function NoteCard({
             width={currentW} 
             height={currentH} 
             onResize={(e, { size }) => onResize && onResize(id, size.width, size.height)}
-            minConstraints={[100, 50]} 
+            minConstraints={type === 'drawing' ? [220, 180] : [100, 50]} 
             maxConstraints={[800, 800]}
             handle={<span className="react-resizable-handle react-resizable-handle-se !w-8 !h-8 touch-none" />}
-         >
+          >
             <div className="w-full h-full relative" style={{ width: currentW, height: currentH }}>
                 {type !== 'status' && (
                   <div className={`drag-handle h-8 w-full absolute top-0 left-0 z-20 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/5 transition-colors rounded-t-lg touch-none`}>

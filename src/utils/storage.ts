@@ -132,7 +132,7 @@ const loadGlobalStore = (): GlobalStore => {
   if (api && api.sendSync) {
     // Electron 环境：从硬盘同步读取
     try {
-      rawData = api.sendSync('load-data-sync');
+      rawData = api.sendSync('load-data-sync') as string | null;
     } catch (e) {
       console.error("IPC Load Error", e);
     }

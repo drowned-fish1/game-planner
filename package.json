@@ -5,8 +5,11 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
+    "icon:generate": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
     "build": "tsc && vite build",
-    "electron:build": "npm run build && electron-builder",
+    "electron:build": "npm run icon:generate && npm run build && electron-builder",
+    "android:sync": "npm run icon:generate && npm run build && npx cap sync android",
+    "android:build": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -62,7 +65,9 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "public/icon.ico",
+      "public/icon.png"
     ],
     "win": {
       "target": [
@@ -73,7 +78,8 @@
           ]
         }
       ],
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

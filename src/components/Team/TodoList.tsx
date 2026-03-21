@@ -5,77 +5,108 @@ import { TodoItem, TeamMember } from '../../utils/storage';
 interface TodoListProps {
   todos: TodoItem[];
   members: TeamMember[];
+  actorName?: string;
   onUpdate: (newTodos: TodoItem[]) => void;
+  onActivity?: (activity: { kind: string; message: string; itemId?: string | null; focusedItemId?: string | null; status?: string }) => void;
 }
 
-export function TodoList({ todos, members, onUpdate }: TodoListProps) {
-  const [newText, setNewText] = useState("");
-  const [assignee, setAssignee] = useState("");
+export function TodoList({ todos, members, actorName = '有人', onUpdate, onActivity }: TodoListProps) {
+  const [newText, setNewText] = useState('');
+  const [assignee, setAssignee] = useState('');
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newText.trim()) return;
-    onUpdate([...todos, { id: uuidv4(), text: newText, done: false, assigneeId: assignee }]);
-    setNewText("");
+
+    const assigneeMember = members.find((member) => member.id === assignee);
+    const nextTodo = { id: uuidv4(), text: newText, done: false, assigneeId: assignee };
+    onUpdate([...todos, nextTodo]);
+    onActivity?.({
+      kind: 'todo:add',
+      itemId: nextTodo.id,
+      message: `${actorName} 添加了待办：${nextTodo.text}${assigneeMember ? `，指派给 ${assigneeMember.name}` : ''}`,
+    });
+    setNewText('');
   };
 
   const toggle = (id: string) => {
-    onUpdate(todos.map(t => t.id === id ? { ...t, done: !t.done } : t));
+    const target = todos.find((todo) => todo.id === id);
+    if (!target) return;
+
+    onUpdate(todos.map((todo) => (todo.id === id ? { ...todo, done: !todo.done } : todo)));
+    onActivity?.({
+      kind: 'todo:toggle',
+      itemId: id,
+      message: `${actorName}${target.done ? ' 重新打开了' : ' 完成了'}待办：${target.text}`,
+    });
   };
 
   const remove = (id: string) => {
-    onUpdate(todos.filter(t => t.id !== id));
+    const target = todos.find((todo) => todo.id === id);
+    if (!target) return;
+
+    onUpdate(todos.filter((todo) => todo.id !== id));
+    onActivity?.({
+      kind: 'todo:remove',
+      itemId: id,
+      message: `${actorName} 删除了待办：${target.text}`,
+    });
   };
 
   return (
-    <div className="w-full h-full flex flex-col relative">
-      <div className="p-4 border-b border-slate-700 font-bold text-slate-200 flex justify-between items-center bg-slate-800">
-        <span>✅ 项目待办</span>
-        <span className="text-xs text-slate-500">{todos.filter(t => !t.done).length} 待完成</span>
+    <div className="relative flex h-full w-full flex-col">
+      <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 p-4 font-bold text-slate-200">
+        <span>项目待办</span>
+        <span className="text-xs text-slate-500">{todos.filter((todo) => !todo.done).length} 项未完成</span>
       </div>
-      
-      {/* 列表区域 */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-900/50 pb-32">
-        {todos.map(todo => {
-          const user = members.find(m => m.id === todo.assigneeId);
+
+      <div className="flex-1 space-y-2 overflow-y-auto bg-slate-900/50 p-3 pb-32">
+        {todos.map((todo) => {
+          const user = members.find((member) => member.id === todo.assigneeId);
           return (
-            <div key={todo.id} className="bg-slate-800 p-3 rounded border border-slate-700 hover:border-emerald-500/50 transition-colors">
-              <div className="flex gap-3 items-start">
-                <input type="checkbox" checked={todo.done} onChange={() => toggle(todo.id)} className="mt-1 w-4 h-4 accent-emerald-500 cursor-pointer" />
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm break-words ${todo.done ? 'line-through text-slate-500' : 'text-slate-200'}`}>{todo.text}</div>
+            <div key={todo.id} className="rounded border border-slate-700 bg-slate-800 p-3 transition-colors hover:border-emerald-500/50">
+              <div className="flex items-start gap-3">
+                <input type="checkbox" checked={todo.done} onChange={() => toggle(todo.id)} className="mt-1 h-4 w-4 cursor-pointer accent-emerald-500" />
+                <div className="min-w-0 flex-1">
+                  <div className={`break-words text-sm ${todo.done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>{todo.text}</div>
                   {user && (
-                    <div className="flex items-center gap-1.5 mt-2 bg-slate-900/80 w-fit px-2 py-0.5 rounded-full border border-slate-700">
+                    <div className="mt-2 flex w-fit items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/80 px-2 py-0.5">
                       {user.avatar ? (
-                        <img src={user.avatar} className="w-4 h-4 rounded-full object-cover"/>
+                        <img src={user.avatar} className="h-4 w-4 rounded-full object-cover" />
                       ) : (
-                        <div className={`w-4 h-4 rounded-full ${user.color} text-[8px] flex items-center justify-center text-white`}>{user.name[0]}</div>
+                        <div className={`flex h-4 w-4 items-center justify-center rounded-full text-[8px] text-white ${user.color}`}>{user.name[0]}</div>
                       )}
                       <span className="text-xs text-slate-400">{user.name}</span>
                     </div>
                   )}
                 </div>
-                <button onClick={() => remove(todo.id)} className="text-slate-500 hover:text-red-400 p-1">×</button>
+                <button onClick={() => remove(todo.id)} className="p-1 text-slate-500 transition-colors hover:text-red-400">
+                  x
+                </button>
               </div>
             </div>
           );
         })}
-        {todos.length === 0 && <div className="text-center text-slate-500 text-sm mt-10">暂无任务</div>}
+        {todos.length === 0 && <div className="mt-10 text-center text-sm text-slate-500">还没有待办任务</div>}
       </div>
 
-      {/* 修复点：bottom-16 (手机抬高) md:bottom-0 (电脑贴底) */}
-      <form onSubmit={add} className="absolute bottom-16 md:bottom-0 left-0 right-0 p-3 border-t border-slate-700 flex flex-col gap-2 bg-slate-800 shadow-2xl z-20">
-        <input 
-          value={newText} onChange={e => setNewText(e.target.value)} 
-          className="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 transition-colors"
+      <form onSubmit={add} className="absolute bottom-16 left-0 right-0 z-20 flex flex-col gap-2 border-t border-slate-700 bg-slate-800 p-3 shadow-2xl md:bottom-0">
+        <input
+          value={newText}
+          onChange={(event) => setNewText(event.target.value)}
+          className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
           placeholder="添加新任务..."
         />
         <div className="flex gap-2">
-          <select value={assignee} onChange={e => setAssignee(e.target.value)} className="bg-slate-700 text-slate-300 text-xs rounded border border-slate-600 flex-1 outline-none px-2 h-9">
+          <select value={assignee} onChange={(event) => setAssignee(event.target.value)} className="h-9 flex-1 rounded border border-slate-600 bg-slate-700 px-2 text-xs text-slate-300 outline-none">
             <option value="">-- 指派给 --</option>
-            {members.map(m => <option key={m.id} value={m.id}>{m.name} - {m.role}</option>)}
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>{member.name} - {member.role}</option>
+            ))}
           </select>
-          <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 rounded font-bold h-9">添加</button>
+          <button type="submit" className="h-9 rounded bg-emerald-600 px-4 text-xs font-bold text-white transition-colors hover:bg-emerald-500">
+            添加
+          </button>
         </div>
       </form>
     </div>
