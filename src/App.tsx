@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Settings as SettingsIcon,
   Lightbulb,
@@ -13,11 +13,7 @@ import {
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { ShortcutHelp } from './components/ShortcutHelp';
-import { BrainstormBoard } from './components/Brainstorm/Board';
-import { TeamManager } from './components/Team/TeamManager';
-import { Docs } from './components/Docs/Docs';
-import { UIManager } from './components/UIPrototype/UIManager';
-import { Settings } from './components/Settings/Settings';
+import { ModuleBoundary } from './components/ModuleBoundary';
 import {
   loadProjectContent,
   saveProjectContent,
@@ -45,6 +41,13 @@ import {
   type RoomActivity,
 } from './utils/collaboration';
 import { describeReconnectAttempt } from './utils/roomConnection';
+
+// 五大工作模块按需拆包：进入对应模块时才加载其代码（tiptap/白板画布等重依赖不进主包）
+const BrainstormBoard = lazy(() => import('./components/Brainstorm/Board').then((m) => ({ default: m.BrainstormBoard })));
+const TeamManager = lazy(() => import('./components/Team/TeamManager').then((m) => ({ default: m.TeamManager })));
+const Docs = lazy(() => import('./components/Docs/Docs').then((m) => ({ default: m.Docs })));
+const UIManager = lazy(() => import('./components/UIPrototype/UIManager').then((m) => ({ default: m.UIManager })));
+const Settings = lazy(() => import('./components/Settings/Settings').then((m) => ({ default: m.Settings })));
 
 type ModuleType = 'brainstorm' | 'docs' | 'team' | 'ui' | 'settings';
 
@@ -739,7 +742,9 @@ function ProjectEditorLayout({
       </div>
 
       {/* ===== Content ===== */}
-      <main className="relative flex-1 overflow-hidden bg-bg pb-16 md:pb-0">{renderModule()}</main>
+      <main className="relative flex-1 overflow-hidden bg-bg pb-16 md:pb-0">
+        <ModuleBoundary>{renderModule()}</ModuleBoundary>
+      </main>
 
       {/* ===== Mobile bottom nav ===== */}
       <div className="fixed bottom-0 left-0 right-0 z-[9999] flex h-16 items-center justify-around border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">

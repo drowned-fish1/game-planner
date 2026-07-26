@@ -1,5 +1,5 @@
 // src/utils/aiService.ts
-import { AIConfig } from '../components/Settings/Settings';
+import type { AIConfig } from '../components/Settings/Settings';
 
 const STORAGE_KEY_CONFIGS = 'gp_ai_configs';
 const STORAGE_KEY_ACTIVE = 'gp_ai_active_id';

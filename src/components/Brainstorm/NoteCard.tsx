@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { Resizable } from 'react-resizable';
 import { Sparkles, Loader2, Bot, Play, GripHorizontal } from 'lucide-react';
-import { AIConfig } from '../Settings/Settings';
+import type { AIConfig } from '../Settings/Settings';
 import { toast } from '../../utils/toast';
 
 const STORAGE_KEY_CONFIGS = 'gp_ai_configs';
