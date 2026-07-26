@@ -98,6 +98,7 @@ export function Toaster() {
             onClick={() => toast.dismiss(t.id)}
             className="shrink-0 rounded-md p-1 text-subtle transition-colors hover:bg-surface-3 hover:text-content"
             aria-label="关闭"
+            title="关闭"
           >
             <X size={14} />
           </button>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { TodoItem, TeamMember } from '../../utils/storage';
 
@@ -80,8 +81,13 @@ export function TodoList({ todos, members, actorName = '有人', onUpdate, onAct
                     </div>
                   )}
                 </div>
-                <button onClick={() => remove(todo.id)} className="p-1 text-subtle transition-colors hover:text-red-400">
-                  x
+                <button
+                  onClick={() => remove(todo.id)}
+                  title="删除待办"
+                  aria-label="删除待办"
+                  className="p-1 text-subtle transition-colors hover:text-red-400"
+                >
+                  <X size={14} />
                 </button>
               </div>
             </div>

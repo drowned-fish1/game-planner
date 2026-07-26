@@ -593,6 +593,7 @@ function ProjectEditorLayout({
           <button
             onClick={onBack}
             title="返回项目大厅"
+            aria-label="返回项目大厅"
             className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-3 hover:text-content"
           >
             <ChevronLeft size={20} />
@@ -647,7 +648,7 @@ function ProjectEditorLayout({
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-        <button onClick={onBack} className="grid h-9 w-9 place-items-center rounded-lg text-muted active:bg-surface-3">
+        <button onClick={onBack} title="返回项目大厅" aria-label="返回项目大厅" className="grid h-9 w-9 place-items-center rounded-lg text-muted active:bg-surface-3">
           <ChevronLeft size={22} />
         </button>
         <div className="min-w-0 flex-1 px-2 text-center">
@@ -656,6 +657,8 @@ function ProjectEditorLayout({
         </div>
         <button
           onClick={() => onSetActiveModule('settings')}
+          title="设置"
+          aria-label="设置"
           className={`grid h-9 w-9 place-items-center rounded-lg active:bg-surface-3 ${
             activeModule === 'settings' ? 'text-brand-400' : 'text-muted'
           }`}

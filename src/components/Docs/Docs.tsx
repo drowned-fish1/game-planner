@@ -248,25 +248,28 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
 
       return (
         <div key={doc.id}>
-          <div 
+          <div
             className={`flex items-center gap-2 py-3 md:py-1 px-2 rounded cursor-pointer group select-none transition-colors ${isActive ? 'bg-brand-600/20 text-brand-400' : 'text-muted hover:bg-surface hover:text-content'}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             onClick={() => handleSelectDoc(doc.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectDoc(doc.id); } }}
           >
-            <span className={`p-1 rounded hover:bg-surface-3/50 ${hasChildren ? 'opacity-100' : 'opacity-0'}`} onClick={(e) => { e.stopPropagation(); hasChildren && toggleExpand(e, doc.id); }}>
+            <span className={`p-1 rounded hover:bg-surface-3/50 ${hasChildren ? 'opacity-100' : 'opacity-0'}`} role="button" tabIndex={0} aria-expanded={doc.expanded} title="展开/折叠" aria-label="展开/折叠子文档" onClick={(e) => { e.stopPropagation(); hasChildren && toggleExpand(e, doc.id); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); hasChildren && toggleExpand(e as any, doc.id); } }}>
               {doc.expanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
             </span>
             {hasChildren ? <Folder size={16} className="text-yellow-500/80"/> : <FileText size={16} className="text-blue-400/80"/>}
             <span className="flex-1 truncate text-sm">{doc.title}</span>
             <div className="flex gap-2 md:gap-1 md:opacity-0 group-hover:opacity-100">
-              <button onClick={(e) => { e.stopPropagation(); handleCreateClick(doc.id); }} className="p-1 hover:bg-surface-3 rounded text-muted hover:text-white"><Plus size={16} /></button>
-              <button onClick={(e) => deleteDoc(e, doc.id)} className="p-1 hover:bg-red-900/50 rounded text-muted hover:text-red-400"><Trash2 size={16} /></button>
+              <button onClick={(e) => { e.stopPropagation(); handleCreateClick(doc.id); }} title="新建子文档" aria-label="新建子文档" className="p-1 hover:bg-surface-3 rounded text-muted hover:text-white"><Plus size={16} /></button>
+              <button onClick={(e) => deleteDoc(e, doc.id)} title="删除文档" aria-label="删除文档" className="p-1 hover:bg-red-900/50 rounded text-muted hover:text-red-400"><Trash2 size={16} /></button>
             </div>
           </div>
           {isActive && headings.length > 0 && (
              <div className="flex flex-col mb-1 animate-in slide-in-from-left-2 duration-200 border-l border-line/50 ml-4 my-1">
                 {headings.map((h, idx) => (
-                   <div key={idx} onClick={(e) => { e.stopPropagation(); scrollToHeading(h.pos); }} className="flex items-center gap-2 py-2 md:py-1 pr-2 rounded cursor-pointer hover:bg-surface text-subtle hover:text-brand-300 text-xs transition-colors" style={{ paddingLeft: `${depth * 12 + 24 + (h.level - 1) * 8}px` }}>
+                   <div key={idx} onClick={(e) => { e.stopPropagation(); scrollToHeading(h.pos); }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); scrollToHeading(h.pos); } }} className="flex items-center gap-2 py-2 md:py-1 pr-2 rounded cursor-pointer hover:bg-surface text-subtle hover:text-brand-300 text-xs transition-colors" style={{ paddingLeft: `${depth * 12 + 24 + (h.level - 1) * 8}px` }}>
                      <Hash size={10} className="opacity-50 shrink-0" /><span className="truncate">{h.text}</span>
                    </div>
                 ))}
@@ -301,8 +304,8 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
         >
           <span className="text-xs font-bold text-muted uppercase tracking-wider">Documents</span>
           <div className="flex gap-2">
-              <button onClick={() => handleCreateClick(null)} className="p-1 hover:bg-brand-600/20 rounded text-muted hover:text-brand-400"><Plus size={18} /></button>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-1 text-muted"><X size={18}/></button>
+              <button onClick={() => handleCreateClick(null)} title="新建文档" aria-label="新建文档" className="p-1 hover:bg-brand-600/20 rounded text-muted hover:text-brand-400"><Plus size={18} /></button>
+              <button onClick={() => setIsMobileMenuOpen(false)} title="关闭文档列表" aria-label="关闭文档列表" className="md:hidden p-1 text-muted"><X size={18}/></button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 scrollbar-thin pb-20 md:pb-2">
@@ -315,11 +318,11 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
         {activeDoc ? (
           <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full relative">
             <div className="flex items-center justify-between px-4 md:px-8 pt-4 md:pt-8 pb-4 mx-0 md:mx-8 border-b border-line gap-2">
-              <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 -ml-2 text-muted hover:text-white"><Menu size={20} /></button>
+              <button onClick={() => setIsMobileMenuOpen(true)} title="打开文档列表" aria-label="打开文档列表" className="md:hidden p-2 -ml-2 text-muted hover:text-white"><Menu size={20} /></button>
               <input value={activeDoc.title} onChange={(e) => updateDocTitle(activeDoc.id, e.target.value)} className="bg-transparent text-xl md:text-4xl font-bold text-white outline-none flex-1 min-w-0 placeholder-subtle truncate" placeholder="无标题"/>
               <div className="flex gap-2 shrink-0">
                 <button onClick={() => { setAiSelectedText(''); setAiMode('generate'); }} className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 bg-iris-600 hover:bg-iris-500 text-white rounded transition-colors text-xs md:text-sm font-bold shadow-lg shadow-iris-700/20"><Sparkles size={14} /> <span className="hidden md:inline">AI 写作</span><span className="md:hidden">AI</span></button>
-                <button onClick={handleExport} className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 bg-surface hover:bg-brand-600 hover:text-white text-muted rounded transition-colors text-xs md:text-sm font-medium"><Share2 size={14} /><span className="hidden md:inline">导出</span></button>
+                <button onClick={handleExport} title="导出文档" aria-label="导出文档" className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 bg-surface hover:bg-brand-600 hover:text-white text-muted rounded transition-colors text-xs md:text-sm font-medium"><Share2 size={14} /><span className="hidden md:inline">导出</span></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 md:px-16 py-4 md:py-8">
@@ -336,7 +339,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
         ) : (
           <div className="flex-1 flex items-center justify-center text-subtle">
              <div className="text-center">
-                <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden mb-4 p-4 bg-surface rounded-full animate-pulse"><Folder size={32} className="text-brand-500" /></button>
+                <button onClick={() => setIsMobileMenuOpen(true)} title="打开文档列表" aria-label="打开文档列表" className="md:hidden mb-4 p-4 bg-surface rounded-full animate-pulse"><Folder size={32} className="text-brand-500" /></button>
                 <FilePlus size={48} className="mx-auto mb-4 opacity-20 hidden md:block" />
                 <p className="hidden md:block">选择一个文档，或者点击左侧 + 号创建</p>
                 <p className="md:hidden text-sm">点击左上角图标打开文档列表</p>
@@ -350,7 +353,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
         <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center backdrop-blur-sm px-4" onClick={() => setIsTemplateModalOpen(false)}>
            <div className="bg-surface border border-line p-6 rounded-xl w-full max-w-[500px]" onClick={e=>e.stopPropagation()}>
               <h3 className="text-white mb-4">选择模板</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{TEMPLATES.map(t=>(<div key={t.id} onClick={()=>createDocFromTemplate(t.id, targetParentId)} className="p-4 bg-surface-3 hover:bg-brand-600 cursor-pointer rounded text-white text-center md:text-left">{t.name}</div>))}</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{TEMPLATES.map(t=>(<div key={t.id} onClick={()=>createDocFromTemplate(t.id, targetParentId)} role="button" tabIndex={0} aria-label={`使用模板 ${t.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); createDocFromTemplate(t.id, targetParentId); } }} className="p-4 bg-surface-3 hover:bg-brand-600 cursor-pointer rounded text-white text-center md:text-left">{t.name}</div>))}</div>
               <button onClick={() => setIsTemplateModalOpen(false)} className="mt-6 w-full py-2 text-subtle hover:text-content text-sm">取消</button>
            </div>
         </div>

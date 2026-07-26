@@ -90,9 +90,15 @@ export function UIComponentWrapper({
       onStop={(_, data) => onUpdate(component.id, { x: data.x, y: data.y })}
       onMouseDown={(e) => { e.stopPropagation(); onSelect(e); }}
     >
-      <div 
+      <div
         ref={nodeRef}
         onClick={handleClick}
+        {...(component.interaction?.type && component.interaction.type !== 'none' ? {
+          role: 'button' as const,
+          tabIndex: 0,
+          'aria-label': component.name,
+          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(e as unknown as React.MouseEvent); } }
+        } : {})}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(e); }}
         className={`absolute group transition-all active:scale-95 ${borderClass} ${toggleClass}`}
         style={{ width: displayW, height: displayH, zIndex: isMoving ? 9999 : (component.zIndex || 1), opacity: opacity, display: displayStyle }}

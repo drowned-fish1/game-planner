@@ -87,9 +87,11 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
                    className="flex-1 bg-bg border border-line-strong rounded-lg px-3 py-2 md:px-4 md:py-3 text-sm text-white focus:border-iris-500 outline-none"
                    autoFocus
                  />
-                 <button 
+                 <button
                    onClick={() => handleRunAI(prompt)}
                    disabled={loading || !prompt.trim()}
+                   title="生成内容"
+                   aria-label="生成内容"
                    className="bg-iris-600 hover:bg-iris-500 disabled:opacity-50 text-white px-3 md:px-4 rounded-lg font-bold"
                  >
                    <ArrowRight size={18} />

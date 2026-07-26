@@ -10,12 +10,12 @@ import {
   Image,
   Link,
   Link as LinkIcon,
-  MoreHorizontal,
   MousePointer2,
   Move,
   PenTool,
   Plus,
   Type,
+  Upload,
   X,
 } from 'lucide-react';
 import { NoteCard, type ConnectorHandle } from './NoteCard';
@@ -478,7 +478,7 @@ export function BrainstormBoard({
             <span className="text-sm font-bold">
               {connectSourceId ? '请点击另一张卡片完成连接' : '请点击起点卡片'}
             </span>
-            <button onClick={() => { setMode('pan'); setConnectSourceId(null); }} className="rounded-full bg-black/20 p-1 transition-colors hover:bg-black/40">
+            <button onClick={() => { setMode('pan'); setConnectSourceId(null); }} className="rounded-full bg-black/20 p-1 transition-colors hover:bg-black/40" title="退出连线模式" aria-label="退出连线模式">
               <X size={14} />
             </button>
           </div>
@@ -652,9 +652,19 @@ export function BrainstormBoard({
                   labels={{
                     middle: (
                       <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="删除连线"
                         onClick={(event) => {
                           event.stopPropagation();
                           deleteConnection(connection.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            deleteConnection(connection.id);
+                          }
                         }}
                         className={`pointer-events-auto z-[999] cursor-pointer rounded-full border border-brand-400/40 bg-bg/90 p-1.5 text-content shadow-xl backdrop-blur transition-all hover:border-red-500 hover:bg-red-500 hover:text-white ${!isDesktop && mode === 'pan' ? 'hidden' : ''}`}
                         title="删除连线"
@@ -681,6 +691,7 @@ export function BrainstormBoard({
             }}
             className={`rounded-full p-2 transition-colors ${mode === 'pan' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
             title="浏览模式"
+            aria-label="浏览模式"
           >
             <Move size={20} />
           </button>
@@ -693,6 +704,7 @@ export function BrainstormBoard({
             }}
             className={`rounded-full p-2 transition-colors ${mode === 'edit' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
             title="编辑模式"
+            aria-label="编辑模式"
           >
             <MousePointer2 size={20} />
           </button>
@@ -700,6 +712,7 @@ export function BrainstormBoard({
             onClick={enterConnectMode}
             className={`rounded-full p-2 transition-colors ${mode === 'connect' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
             title="连线模式"
+            aria-label="连线模式"
           >
             <LinkIcon size={20} />
           </button>
@@ -709,34 +722,34 @@ export function BrainstormBoard({
         <div className="pointer-events-auto flex flex-col items-end gap-3">
           <div className={`origin-bottom rounded-2xl border border-line/80 bg-bg/95 p-3 shadow-2xl backdrop-blur flex flex-col gap-3 transition-all duration-300 ${isMenuOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'}`}>
             <div className="flex gap-2">
-              <button onClick={exportAsImage} className="rounded-full bg-blue-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-blue-500" title="导出图片">
+              <button onClick={exportAsImage} className="rounded-full bg-blue-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-blue-500" title="导出图片" aria-label="导出图片">
                 <Image size={18} />
               </button>
-              <button onClick={() => fileInputRef.current?.click()} className="rounded-full bg-indigo-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-indigo-500" title="上传文件">
-                <MoreHorizontal size={18} />
+              <button onClick={() => fileInputRef.current?.click()} className="rounded-full bg-indigo-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-indigo-500" title="上传文件" aria-label="上传文件">
+                <Upload size={18} />
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => addItem('drawing')} className="rounded-full bg-amber-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-amber-500" title="绘图">
+              <button onClick={() => addItem('drawing')} className="rounded-full bg-amber-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-amber-500" title="绘图" aria-label="添加绘图磁贴">
                 <PenTool size={18} />
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => addItem('code')} className="rounded-full bg-surface-3 px-4 py-2 text-white shadow-lg transition-colors hover:bg-line-strong" title="代码">
+              <button onClick={() => addItem('code')} className="rounded-full bg-surface-3 px-4 py-2 text-white shadow-lg transition-colors hover:bg-line-strong" title="代码" aria-label="添加代码磁贴">
                 <Code size={18} />
               </button>
-              <button onClick={() => addItem('link')} className="rounded-full bg-sky-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-sky-500" title="网页">
+              <button onClick={() => addItem('link')} className="rounded-full bg-sky-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-sky-500" title="网页" aria-label="添加网页磁贴">
                 <Link size={18} />
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => addItem('status', 'unused')} className="rounded-full bg-iris-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-iris-500" title="状态">
+              <button onClick={() => addItem('status', 'unused')} className="rounded-full bg-iris-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-iris-500" title="状态" aria-label="添加状态磁贴">
                 <Activity size={18} />
               </button>
-              <button onClick={() => addItem('text')} className="rounded-full bg-yellow-500 px-4 py-2 text-white shadow-lg transition-colors hover:bg-yellow-400" title="便签">
+              <button onClick={() => addItem('text')} className="rounded-full bg-yellow-500 px-4 py-2 text-white shadow-lg transition-colors hover:bg-yellow-400" title="便签" aria-label="添加便签">
                 <Type size={18} />
               </button>
-              <button onClick={() => addItem('ai')} className="rounded-full border border-iris-500 bg-iris-700 px-4 py-2 text-white shadow-lg transition-colors hover:bg-iris-700" title="AI 助手">
+              <button onClick={() => addItem('ai')} className="rounded-full border border-iris-500 bg-iris-700 px-4 py-2 text-white shadow-lg transition-colors hover:bg-iris-700" title="AI 助手" aria-label="添加 AI 助手磁贴">
                 <Bot size={18} />
               </button>
             </div>
@@ -744,6 +757,9 @@ export function BrainstormBoard({
           <button
             onClick={() => setIsMenuOpen((prev) => !prev)}
             className={`flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-2xl transition-transform duration-300 hover:bg-brand-400 md:h-16 md:w-16 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}
+            title="添加磁贴"
+            aria-label="添加磁贴"
+            aria-expanded={isMenuOpen}
           >
             <Plus size={32} />
           </button>

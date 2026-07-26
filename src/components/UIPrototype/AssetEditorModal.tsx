@@ -58,7 +58,7 @@ export function AssetEditorModal({ onSave, onClose }: AssetEditorModalProps) {
             <ImageIcon className="text-iris-500" size={20}/> 
             资产切片编辑器 (Asset Slicer)
           </h3>
-          <button onClick={onClose} className="text-muted hover:text-white"><X size={20} /></button>
+          <button onClick={onClose} className="text-muted hover:text-white" title="关闭" aria-label="关闭资产编辑器"><X size={20} /></button>
         </div>
 
         <div className="flex-1 flex overflow-hidden">

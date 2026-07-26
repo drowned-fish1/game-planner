@@ -245,7 +245,17 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
           {visibleProjects.map((project) => (
             <div
               key={project.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`打开项目 ${project.name}`}
               onClick={() => onOpenProject(project)}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpenProject(project);
+                }
+              }}
               onContextMenu={(e) => handleContextMenu(e, project.id)}
               className="group relative flex aspect-[4/3] cursor-pointer animate-fade-in-up flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-500/50 hover:shadow-elevated"
             >
@@ -272,6 +282,8 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                     openMenuAt(rect.right, rect.bottom, project.id);
                   }}
+                  title="更多操作"
+                  aria-label="项目更多操作"
                   className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg bg-black/40 text-white/80 opacity-0 backdrop-blur-sm transition-all hover:bg-black/60 hover:text-white group-hover:opacity-100"
                 >
                   <MoreVertical size={15} />

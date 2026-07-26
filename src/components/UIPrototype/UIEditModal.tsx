@@ -60,7 +60,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
                <p className="text-subtle text-[10px] uppercase">ID: {component.id.slice(0,6)}</p>
              </div>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-white"><X size={20} /></button>
+          <button onClick={onClose} className="text-muted hover:text-white" title="关闭" aria-label="关闭属性设置"><X size={20} /></button>
         </div>
 
         {/* Tabs */}
@@ -153,9 +153,9 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
               <div className="flex items-center justify-between bg-surface-3/30 p-3 rounded border border-line-strong">
                  <div className="flex items-center gap-2 text-sm text-content"><Layers size={16}/> 层级 (Z-Index)</div>
                  <div className="flex items-center gap-2">
-                   <button onClick={() => setZIndex(z => Math.max(0, z-1))} className="w-6 h-6 bg-surface rounded text-white">-</button>
+                   <button onClick={() => setZIndex(z => Math.max(0, z-1))} className="w-6 h-6 bg-surface rounded text-white" title="降低层级" aria-label="降低层级">-</button>
                    <input type="number" value={zIndex} onChange={e => setZIndex(Number(e.target.value))} className="w-12 bg-bg text-center text-white text-sm rounded border border-line-strong py-0.5" />
-                   <button onClick={() => setZIndex(z => z+1)} className="w-6 h-6 bg-surface rounded text-white">+</button>
+                   <button onClick={() => setZIndex(z => z+1)} className="w-6 h-6 bg-surface rounded text-white" title="提高层级" aria-label="提高层级">+</button>
                  </div>
               </div>
 
@@ -163,21 +163,21 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
               <div className="space-y-3">
                 <label className="text-xs text-subtle font-bold uppercase">初始状态 (Initial State)</label>
                 
-                <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsDisabled(!isDisabled)}>
+                <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsDisabled(!isDisabled)} role="switch" aria-checked={isDisabled} tabIndex={0} aria-label="切换禁用状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsDisabled(!isDisabled); } }}>
                    <span className="text-sm text-white flex items-center gap-2"><EyeOff size={14} className={isDisabled ? 'text-red-500' : 'text-subtle'}/> 禁用 (Disabled)</span>
                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isDisabled ? 'bg-red-600' : 'bg-surface-3'}`}>
                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isDisabled ? 'left-4.5' : 'left-0.5'}`}></div>
                    </div>
                 </div>
 
-                <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsActive(!isActive)}>
+                <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsActive(!isActive)} role="switch" aria-checked={isActive} tabIndex={0} aria-label="切换激活状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsActive(!isActive); } }}>
                    <span className="text-sm text-white flex items-center gap-2"><Zap size={14} className={isActive ? 'text-yellow-500' : 'text-subtle'}/> 激活/高亮 (Active)</span>
                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isActive ? 'bg-yellow-600' : 'bg-surface-3'}`}>
                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isActive ? 'left-4.5' : 'left-0.5'}`}></div>
                    </div>
                 </div>
 
-                <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsVisible(!isVisible)}>
+                <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsVisible(!isVisible)} role="switch" aria-checked={isVisible} tabIndex={0} aria-label="切换可见状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsVisible(!isVisible); } }}>
                    <span className="text-sm text-white flex items-center gap-2">👁️ 可见 (Visible)</span>
                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isVisible ? 'bg-brand-600' : 'bg-surface-3'}`}>
                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isVisible ? 'left-4.5' : 'left-0.5'}`}></div>

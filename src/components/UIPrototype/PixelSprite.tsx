@@ -66,6 +66,8 @@ export const PixelSprite: React.FC<PixelSpriteProps> = ({
     <canvas
       ref={canvasRef}
       onClick={onClick}
+      role="img"
+      aria-label={config.label}
       className={`inline-block ${className}`}
       style={{
         display: 'block',

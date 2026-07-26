@@ -566,7 +566,23 @@ export function TeamManager({
           {members.map((member) => (
             <div
               key={member.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`管理成员 ${member.name}`}
               onClick={(event) => window.innerWidth < 768 && handleContextMenu(event, member.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setContextMenu({
+                    visible: true,
+                    x: Math.min(rect.left + rect.width / 2, window.innerWidth - 220),
+                    y: Math.min(rect.top + rect.height / 2, window.innerHeight - 260),
+                    memberId: member.id,
+                  });
+                }
+              }}
               onContextMenu={(event) => handleContextMenu(event, member.id)}
               className="group relative flex cursor-pointer select-none flex-col items-center gap-3 rounded-xl border border-line bg-surface p-4 transition-all hover:-translate-y-1 hover:border-brand-500 hover:shadow-xl md:p-6"
             >

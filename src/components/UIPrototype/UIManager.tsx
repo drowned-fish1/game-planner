@@ -91,7 +91,7 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
          <div className="w-64 bg-bg border-r border-line p-4 flex flex-col gap-4 select-none shrink-0 z-10 h-full">
             <div className="flex justify-between items-center mb-1">
                 <h3 className="text-muted text-xs font-bold uppercase">UI 资产库</h3>
-                <button onClick={() => setShowAssetModal(true)} className="p-1.5 hover:bg-surface-3 rounded text-brand-500 hover:text-brand-400 transition-colors" title="新建资产"><Plus size={16}/></button>
+                <button onClick={() => setShowAssetModal(true)} className="p-1.5 hover:bg-surface-3 rounded text-brand-500 hover:text-brand-400 transition-colors" title="新建资产" aria-label="新建资产"><Plus size={16}/></button>
             </div>
             
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
@@ -154,14 +154,14 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         <button onClick={() => setShowCreateModal(true)} className="aspect-video bg-surface/50 border-2 border-dashed border-line hover:border-brand-500 rounded-xl flex flex-col items-center justify-center group"><Plus size={32} className="text-subtle group-hover:text-white"/><span className="text-subtle mt-2">新建页面</span></button>
         {data.pages.map(page => (
-            <div key={page.id} onClick={() => setEditingPageId(page.id)} className={`aspect-video bg-surface border-2 rounded-xl relative group cursor-pointer hover:-translate-y-1 transition-all ${data.startPageId === page.id ? 'border-iris-500' : 'border-line'}`}>
+            <div key={page.id} onClick={() => setEditingPageId(page.id)} role="button" tabIndex={0} aria-label={`编辑页面 ${page.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingPageId(page.id); } }} className={`aspect-video bg-surface border-2 rounded-xl relative group cursor-pointer hover:-translate-y-1 transition-all ${data.startPageId === page.id ? 'border-iris-500' : 'border-line'}`}>
                 <div className="w-full h-full flex flex-col items-center justify-center text-white font-bold bg-bg/50">
                     {page.name}
                     <span className="text-[10px] text-subtle font-normal uppercase mt-1">{page.type}</span>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => setStartPage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-iris-600"><Play size={14}/></button>
-                    <button onClick={(e) => deletePage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-red-600"><Trash2 size={14}/></button>
+                    <button onClick={(e) => setStartPage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-iris-600" title="设为启动页" aria-label="设为启动页"><Play size={14}/></button>
+                    <button onClick={(e) => deletePage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-red-600" title="删除页面" aria-label="删除页面"><Trash2 size={14}/></button>
                 </div>
                 {data.startPageId === page.id && <div className="absolute top-2 left-2 bg-iris-600 text-[10px] px-2 rounded font-bold">HOME</div>}
             </div>
@@ -185,7 +185,7 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
                 <h3 className="text-white font-bold mb-4 text-xl">选择界面模板</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {PAGE_PRESETS.map((p, i) => (
-                        <div key={i} onClick={() => createPage(p)} className="bg-surface-3/50 p-4 rounded-lg cursor-pointer hover:bg-brand-600/20 hover:border-brand-500 border border-line-strong text-center flex flex-col items-center justify-center h-32 group transition-all">
+                        <div key={i} onClick={() => createPage(p)} role="button" tabIndex={0} aria-label={`使用模板 ${p.label} 创建页面`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); createPage(p); } }} className="bg-surface-3/50 p-4 rounded-lg cursor-pointer hover:bg-brand-600/20 hover:border-brand-500 border border-line-strong text-center flex flex-col items-center justify-center h-32 group transition-all">
                             <p className="text-content group-hover:text-white font-bold mb-1">{p.label}</p>
                             <span className="text-[10px] text-subtle">{p.w}x{p.h}</span>
                         </div>

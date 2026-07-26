@@ -1,6 +1,6 @@
 // src/components/UIPrototype/UICanvas.tsx
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Type, MoreHorizontal, Image, Lock, Move } from 'lucide-react';
+import { ArrowLeft, Type, Upload, Image, Lock, Move } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { toPng } from 'html-to-image';
 import { UIPage, UIComponent, InteractionType, CustomAsset } from '../../utils/storage';
@@ -185,13 +185,13 @@ export function UICanvas({
       {/* 顶部工具栏 */}
       <div className="h-14 bg-surface border-b border-line flex items-center justify-between px-4 shrink-0 z-20">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-surface-3 rounded-lg text-content"><ArrowLeft size={20} /></button>
+          <button onClick={onBack} className="p-2 hover:bg-surface-3 rounded-lg text-content" title="返回页面列表" aria-label="返回页面列表"><ArrowLeft size={20} /></button>
           <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="bg-transparent text-white font-bold outline-none border-b border-transparent focus:border-iris-500 px-1" />
         </div>
         <div className="flex gap-2">
-           <button onClick={() => addItem('text')} className="p-2 hover:bg-surface-3 rounded text-content" title="文本"><Type size={18}/></button>
-           <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-surface-3 rounded text-content" title="上传"><MoreHorizontal size={18}/></button>
-           <button onClick={exportAsImage} className="p-2 hover:bg-blue-600 bg-blue-700 rounded text-white" title="导出"><Image size={18}/></button>
+           <button onClick={() => addItem('text')} className="p-2 hover:bg-surface-3 rounded text-content" title="添加文本" aria-label="添加文本"><Type size={18}/></button>
+           <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-surface-3 rounded text-content" title="上传媒体" aria-label="上传媒体"><Upload size={18}/></button>
+           <button onClick={exportAsImage} className="p-2 hover:bg-blue-600 bg-blue-700 rounded text-white" title="导出" aria-label="导出为图片"><Image size={18}/></button>
         </div>
       </div>
 

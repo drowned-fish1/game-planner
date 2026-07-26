@@ -390,7 +390,7 @@ export function NoteCard({
                     {isLoading ? (
                         <Loader2 size={12} className="animate-spin text-purple-400"/>
                     ) : (
-                        <button onClick={() => handleAISummarize('self')} className="text-purple-300 hover:text-white p-1">
+                        <button onClick={() => handleAISummarize('self')} className="text-purple-300 hover:text-white p-1" title="运行 AI 处理" aria-label="运行 AI 处理">
                             <Play size={12} fill="currentColor" />
                         </button>
                     )}
@@ -418,7 +418,7 @@ export function NoteCard({
     if (type === 'status') {
       return (
         <div className="w-full h-full flex items-center justify-center" onPointerDown={stopProp}>
-           <div onClick={cycleStatus} className={`w-full h-full ${currentStatus.color} ${currentStatus.text} rounded-full shadow flex items-center justify-center font-bold text-sm cursor-pointer border border-white/20 select-none active:scale-95 transition-transform`}>
+           <div onClick={cycleStatus} role="button" tabIndex={0} title="点击切换状态" aria-label="切换状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleStatus(); } }} className={`w-full h-full ${currentStatus.color} ${currentStatus.text} rounded-full shadow flex items-center justify-center font-bold text-sm cursor-pointer border border-white/20 select-none active:scale-95 transition-transform`}>
              {currentStatus.label}
            </div>
         </div>
@@ -507,6 +507,7 @@ export function NoteCard({
             : 'border-slate-600 bg-slate-900/90 hover:border-emerald-300 hover:bg-emerald-500/90'
         }`}
         title={'\u8fde\u63a5\u78c1\u8d34'}
+        aria-label={'\u8fde\u63a5\u78c1\u8d34'}
       >
         <span className={`block rounded-full ${isActive ? 'h-2.5 w-2.5 bg-white' : 'h-2 w-2 bg-emerald-300'}`} />
       </button>
@@ -543,7 +544,7 @@ export function NoteCard({
                 {type !== 'status' && (
                   <div className={`drag-handle h-8 w-full absolute top-0 left-0 z-20 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/5 transition-colors rounded-t-lg touch-none`}>
                     <GripHorizontal size={16} className="text-slate-400 opacity-50" />
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(id); }} className="text-slate-400 hover:text-red-500 bg-slate-200/50 hover:bg-red-100 rounded-full w-5 h-5 flex items-center justify-center">×</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(id); }} className="text-slate-400 hover:text-red-500 bg-slate-200/50 hover:bg-red-100 rounded-full w-5 h-5 flex items-center justify-center" title="删除磁贴" aria-label="删除磁贴">×</button>
                   </div>
                 )}
                 <div className={`w-full h-full overflow-hidden rounded-lg ${type !== 'status' ? 'pt-8' : ''}`}>
