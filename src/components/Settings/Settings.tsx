@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2 } from 'lucide-react';
 import { toast } from '../../utils/toast';
 import { confirmDialog } from '../../utils/confirm';
+import { testAIConnection } from '../../utils/aiService';
 
 export interface AIConfig {
   id: string;
@@ -31,6 +32,8 @@ export function Settings() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [testingId, setTestingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadConfigs();
@@ -68,6 +71,23 @@ export function Settings() {
   const updateConfig = (id: string, field: keyof AIConfig, value: string) => {
     setConfigs(configs.map(c => c.id === id ? { ...c, [field]: value } : c));
     setHasChanges(true);
+  };
+
+  const toggleKeyVisible = (id: string) => {
+    setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const testConnection = async (config: AIConfig) => {
+    if (testingId) return;
+    setTestingId(config.id);
+    try {
+      await testAIConnection(config);
+      toast.success(`「${config.name}」连接成功，模型响应正常`);
+    } catch (err: any) {
+      toast.error(`「${config.name}」连接失败：${err?.message || '未知错误'}`);
+    } finally {
+      setTestingId(null);
+    }
   };
 
   const deleteConfig = async (id: string) => {
@@ -133,7 +153,18 @@ export function Settings() {
                                     <input value={config.name} onChange={e => updateConfig(config.id, 'name', e.target.value)} className="flex-1 border-b border-transparent bg-transparent text-lg font-bold text-white outline-none focus:border-line-strong" placeholder="配置名称" />
                                     {config.id === activeId && <span className="chip border-brand-500/30 bg-brand-500/10 text-brand-300">当前使用</span>}
                                 </div>
-                                <button onClick={() => deleteConfig(config.id)} className="rounded-lg p-2 text-muted transition-colors hover:bg-red-500/15 hover:text-red-400"><Trash2 size={18} /></button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => testConnection(config)}
+                                        disabled={testingId !== null}
+                                        className="btn-outline text-xs disabled:cursor-not-allowed disabled:opacity-60"
+                                        title="用当前填写的配置发一条最小请求验证连通性"
+                                    >
+                                        {testingId === config.id ? <Loader2 size={14} className="animate-spin" /> : <PlugZap size={14} />}
+                                        测试连接
+                                    </button>
+                                    <button onClick={() => deleteConfig(config.id)} className="rounded-lg p-2 text-muted transition-colors hover:bg-red-500/15 hover:text-red-400" title="删除此配置" aria-label="删除此配置"><Trash2 size={18} /></button>
+                                </div>
                             </div>
 
                             {/* 卡片内容 (表单) */}
@@ -144,7 +175,24 @@ export function Settings() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="flex items-center gap-1 text-xs text-subtle"><Key size={12}/> API Key</label>
-                                    <input value={config.key} onChange={e => updateConfig(config.id, 'key', e.target.value)} type="password" className="input font-mono" placeholder="sk-..." />
+                                    <div className="relative">
+                                        <input
+                                            value={config.key}
+                                            onChange={e => updateConfig(config.id, 'key', e.target.value)}
+                                            type={visibleKeys[config.id] ? 'text' : 'password'}
+                                            className="input pr-10 font-mono"
+                                            placeholder="sk-..."
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleKeyVisible(config.id)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-subtle transition-colors hover:text-content"
+                                            title={visibleKeys[config.id] ? '隐藏 Key' : '显示 Key'}
+                                            aria-label={visibleKeys[config.id] ? '隐藏 Key' : '显示 Key'}
+                                        >
+                                            {visibleKeys[config.id] ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-1.5 md:col-span-2">
                                     <label className="flex items-center gap-1 text-xs text-subtle"><Settings2 size={12}/> 模型名称 (Model)</label>
