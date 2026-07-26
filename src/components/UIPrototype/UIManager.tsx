@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { UIPage, PageType, CustomAsset } from '../../utils/storage';
 import { Plus, Layout, Trash2, Play, Monitor, Smartphone, Tablet, Sidebar, CreditCard, Square } from 'lucide-react';
-import { UICanvas } from './UICanvas'; 
+import { UICanvas } from './UICanvas';
 import { AssetEditorModal } from './AssetEditorModal';
+import { DEFAULT_MODAL_BG, DEFAULT_PAGE_BG } from './constants';
 import { UI_ASSETS as DEFAULT_ASSETS } from './assets';
 import { PixelSprite } from './PixelSprite';
 import { confirmDialog } from '../../utils/confirm';
@@ -56,7 +57,7 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
   const createPage = (preset: typeof PAGE_PRESETS[0]) => {
     const newPage: UIPage = {
       id: uuidv4(), name: `${preset.label} ${data.pages.length + 1}`, type: preset.type,
-      width: preset.w, height: preset.h, backgroundColor: preset.type.includes('modal') ? '#2a2a2a' : '#1e1e1e', components: []
+      width: preset.w, height: preset.h, backgroundColor: preset.type.includes('modal') ? DEFAULT_MODAL_BG : DEFAULT_PAGE_BG, components: []
     };
     onUpdate({ ...data, pages: [...data.pages, newPage] });
     setShowCreateModal(false);

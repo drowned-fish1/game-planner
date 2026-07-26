@@ -18,5 +18,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 // Use contextBridge
 window.electronAPI?.on('main-process-message', (message) => {
-  console.log(message)
+  if (import.meta.env.DEV) console.log(message)
 })

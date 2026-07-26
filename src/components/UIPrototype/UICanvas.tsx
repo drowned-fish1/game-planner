@@ -7,6 +7,7 @@ import { UIPage, UIComponent, InteractionType, CustomAsset } from '../../utils/s
 import { UI_ASSETS as DEFAULT_ASSETS } from './assets';
 import { UIComponentWrapper } from './UIComponentWrapper';
 import { UIEditModal } from './UIEditModal';
+import { DEFAULT_MODAL_BG, DEFAULT_PAGE_BG, MODAL_PREVIEW_BORDER } from './constants';
 
 interface UICanvasProps {
   page: UIPage;
@@ -208,7 +209,7 @@ export function UICanvas({
              <div 
                ref={captureRef}
                className="shadow-2xl relative border border-line transition-all shrink-0 pointer-events-auto"
-               style={{ width: currentPage.width, height: currentPage.height, backgroundColor: currentPage.backgroundColor || '#1e1e1e' }}
+               style={{ width: currentPage.width, height: currentPage.height, backgroundColor: currentPage.backgroundColor || DEFAULT_PAGE_BG }}
                onDrop={handleDrop} onDragOver={handleDragOver} onClick={(e) => { e.stopPropagation(); handleBackgroundClick(); }} 
              >
                 {renderComponents(currentPage.components)}
@@ -218,7 +219,7 @@ export function UICanvas({
                         className="relative shadow-2xl overflow-hidden animate-in zoom-in-95"
                         style={{ 
                           width: modalPage.width, height: modalPage.height, 
-                          backgroundColor: modalPage.backgroundColor || '#2a2a2a', border: '1px solid #444'
+                          backgroundColor: modalPage.backgroundColor || DEFAULT_MODAL_BG, border: `1px solid ${MODAL_PREVIEW_BORDER}`
                         }}
                      >
                        {renderComponents(modalPage.components, true)}

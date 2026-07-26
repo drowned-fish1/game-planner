@@ -61,6 +61,11 @@ type PendingConnection = {
   handle: ConnectorHandle;
 };
 
+// 导出 PNG 的底色需要具体色值（html-to-image 不解析 CSS 变量），与 --bg 令牌保持一致
+const BOARD_EXPORT_BACKGROUND = '#0C111A';
+// Xarrow 连线色需要具体色值，对应 brand-400（#34d399）
+const CONNECTION_COLOR = '#34d399';
+
 function getItemDefaults(type: BoardItem['type']) {
   switch (type) {
     case 'text':
@@ -413,7 +418,7 @@ export function BrainstormBoard({
         if (!captureRef.current) return;
 
         const dataUrl = await toPng(captureRef.current, {
-          backgroundColor: '#0f172a',
+          backgroundColor: BOARD_EXPORT_BACKGROUND,
           pixelRatio: 2,
           filter: (node) => !node.classList?.contains('drag-handle-ignored'),
         });
@@ -546,7 +551,7 @@ export function BrainstormBoard({
             ref={captureRef}
             className="relative h-[4000px] w-[4000px] bg-bg"
             style={{
-              backgroundImage: 'radial-gradient(#334155 1px, transparent 1px)',
+              backgroundImage: 'radial-gradient(rgb(var(--line-strong)) 1px, transparent 1px)',
               backgroundSize: '40px 40px',
               ['--xarrow-inv-scale' as any]: 1,
               ['--xarrow-inv-tx' as any]: '0px',
@@ -638,7 +643,7 @@ export function BrainstormBoard({
                   end={connection.end}
                   startAnchor={connection.startHandle ?? 'auto'}
                   endAnchor={connection.endHandle ?? 'auto'}
-                  color="#34d399"
+                  color={CONNECTION_COLOR}
                   strokeWidth={3.5}
                   headSize={5}
                   path="smooth"

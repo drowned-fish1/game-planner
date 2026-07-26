@@ -34,11 +34,11 @@ interface NoteCardProps {
 }
 
 const STATUS_TYPES = {
-  'used': { label: '已使用', color: 'bg-emerald-500', text: 'text-white' },
-  'unused': { label: '未使用', color: 'bg-slate-600', text: 'text-slate-200' },
+  'used': { label: '已使用', color: 'bg-brand-500', text: 'text-white' },
+  'unused': { label: '未使用', color: 'bg-surface-3', text: 'text-muted' },
   'deprecated': { label: '废弃', color: 'bg-red-500', text: 'text-white' },
   'verify': { label: '需要验证', color: 'bg-yellow-500', text: 'text-black' },
-  'core': { label: '核心创意', color: 'bg-purple-600', text: 'text-white' },
+  'core': { label: '核心创意', color: 'bg-iris-600', text: 'text-white' },
 };
 
 type StatusKey = keyof typeof STATUS_TYPES;
@@ -381,31 +381,31 @@ export function NoteCard({
 
     if (type === 'ai') {
         return (
-            <div className="flex flex-col w-full h-full bg-slate-900 text-white overflow-hidden" onPointerDown={stopProp}>
-                <div className="h-8 bg-purple-900/50 border-b border-purple-500/30 flex items-center justify-between px-2 shrink-0 select-none">
-                    <div className="flex items-center gap-1.5 text-purple-300">
+            <div className="flex flex-col w-full h-full bg-surface text-content overflow-hidden" onPointerDown={stopProp}>
+                <div className="h-8 bg-iris-700/40 border-b border-iris-500/30 flex items-center justify-between px-2 shrink-0 select-none">
+                    <div className="flex items-center gap-1.5 text-iris-300">
                         <Bot size={14} />
                         <span className="text-[10px] font-bold uppercase">AI Processor</span>
                     </div>
                     {isLoading ? (
-                        <Loader2 size={12} className="animate-spin text-purple-400"/>
+                        <Loader2 size={12} className="animate-spin text-iris-400"/>
                     ) : (
-                        <button onClick={() => handleAISummarize('self')} className="text-purple-300 hover:text-white p-1" title="运行 AI 处理" aria-label="运行 AI 处理">
+                        <button onClick={() => handleAISummarize('self')} className="text-iris-300 hover:text-white p-1" title="运行 AI 处理" aria-label="运行 AI 处理">
                             <Play size={12} fill="currentColor" />
                         </button>
                     )}
                 </div>
-                <textarea 
-                    className="flex-1 bg-transparent resize-none outline-none text-slate-200 text-xs p-3 placeholder-purple-300/20"
-                    placeholder="输入内容点击运行，或连接其他磁贴..." 
-                    value={content} 
+                <textarea
+                    className="flex-1 bg-transparent resize-none outline-none text-content text-xs p-3 placeholder-iris-300/20"
+                    placeholder="输入内容点击运行，或连接其他磁贴..."
+                    value={content}
                     onChange={(e) => onUpdate(id, e.target.value)}
                 />
                 {inputs.length > 0 && (
-                    <button 
-                        onClick={() => handleAISummarize('inputs')} 
-                        disabled={isLoading} 
-                        className="h-8 shrink-0 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white text-xs flex items-center justify-center gap-2 transition-colors"
+                    <button
+                        onClick={() => handleAISummarize('inputs')}
+                        disabled={isLoading}
+                        className="h-8 shrink-0 bg-iris-600 hover:bg-iris-500 active:bg-iris-700 text-white text-xs flex items-center justify-center gap-2 transition-colors"
                     >
                         <Sparkles size={14} /> 
                         处理 {inputs.length} 个来源
@@ -469,15 +469,15 @@ export function NoteCard({
   };
 
   let borderClass = "";
-  if (isSelected) borderClass = type === 'ai' ? "ring-2 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]" : "ring-2 ring-emerald-500 shadow-lg";
+  if (isSelected) borderClass = type === 'ai' ? "ring-2 ring-iris-500 shadow-[0_0_15px_rgba(139,124,246,0.5)]" : "ring-2 ring-brand-500 shadow-lg";
   else borderClass = "hover:ring-1 hover:ring-white/30";
 
   let bgClass = "bg-[#fff9c4]";
   if (type === 'note' || type === 'text') bgClass = type === 'text' ? "bg-white" : "bg-[#fff9c4]";
-  if (type === 'ai') bgClass = "bg-slate-900 border-2 border-purple-500/50";
-  else if (type === 'code') bgClass = "bg-[#1e1e1e] border border-slate-700";
-  else if (type === 'image' || type === 'status') bgClass = "bg-transparent"; 
-  else if (type === 'video' || type === 'audio') bgClass = "bg-slate-900 border border-slate-700";
+  if (type === 'ai') bgClass = "bg-surface border-2 border-iris-500/50";
+  else if (type === 'code') bgClass = "bg-[#1e1e1e] border border-line-strong";
+  else if (type === 'image' || type === 'status') bgClass = "bg-transparent";
+  else if (type === 'video' || type === 'audio') bgClass = "bg-surface border border-line";
   else if (type === 'drawing') bgClass = "bg-slate-100 border border-slate-300";
 
   const handleBaseClass = `absolute z-[100] flex h-6 w-6 items-center justify-center rounded-full border shadow-lg touch-none transition-all duration-200 ${
@@ -503,13 +503,13 @@ export function NoteCard({
         }}
         className={`${handleBaseClass} ${positionClass} ${
           isActive
-            ? 'border-emerald-200 bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.65)]'
-            : 'border-slate-600 bg-slate-900/90 hover:border-emerald-300 hover:bg-emerald-500/90'
+            ? 'border-brand-200 bg-brand-500 shadow-[0_0_18px_rgba(16,185,129,0.65)]'
+            : 'border-line-strong bg-surface/90 hover:border-brand-300 hover:bg-brand-500/90'
         }`}
         title={'\u8fde\u63a5\u78c1\u8d34'}
         aria-label={'\u8fde\u63a5\u78c1\u8d34'}
       >
-        <span className={`block rounded-full ${isActive ? 'h-2.5 w-2.5 bg-white' : 'h-2 w-2 bg-emerald-300'}`} />
+        <span className={`block rounded-full ${isActive ? 'h-2.5 w-2.5 bg-white' : 'h-2 w-2 bg-brand-300'}`} />
       </button>
     );
   };
@@ -541,13 +541,12 @@ export function NoteCard({
             handle={<span className="react-resizable-handle react-resizable-handle-se !w-8 !h-8 touch-none" />}
           >
             <div className="w-full h-full relative" style={{ width: currentW, height: currentH }}>
-                {type !== 'status' && (
-                  <div className={`drag-handle h-8 w-full absolute top-0 left-0 z-20 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/5 transition-colors rounded-t-lg touch-none`}>
+                {/* 状态磁贴较矮：拖拽栏改为覆盖式，不挤压内容 */}
+                <div className={`drag-handle w-full absolute top-0 left-0 z-20 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/5 transition-colors rounded-t-lg touch-none ${type === 'status' ? 'h-6' : 'h-8'}`}>
                     <GripHorizontal size={16} className="text-slate-400 opacity-50" />
                     <button onClick={(e) => { e.stopPropagation(); onDelete(id); }} className="text-slate-400 hover:text-red-500 bg-slate-200/50 hover:bg-red-100 rounded-full w-5 h-5 flex items-center justify-center" title="删除磁贴" aria-label="删除磁贴">×</button>
-                  </div>
-                )}
-                <div className={`w-full h-full overflow-hidden rounded-lg ${type !== 'status' ? 'pt-8' : ''}`}>
+                </div>
+                <div className={`w-full h-full overflow-hidden rounded-lg ${type === 'status' ? '' : 'pt-8'}`}>
                     {renderContent()}
                 </div>
             </div>
