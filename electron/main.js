@@ -35,7 +35,8 @@ function createWindow() {
   if (app.isPackaged) {
     win.loadFile(path.join(APP_ROOT, 'dist/index.html'));
   } else {
-    win.loadURL('http://localhost:5173');
+    // vite-plugin-electron 注入实际端口；vite 在 5173 被占时会自动换端口
+    win.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173');
   }
 }
 

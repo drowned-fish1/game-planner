@@ -99,6 +99,7 @@
 22. 白板多选与对齐：框选、批量移动/删除、基础对齐吸附。
 23. 浅色主题：主题令牌、切换入口与本地偏好持久化。
 24. 质量门禁：pre-commit 执行 TypeScript、ESLint 和单元测试；补齐 `storage` 与 `normalizeRoomServerUrl` 关键路径测试。
+25. 全链路回归（见 `REGRESSION_CHECKLIST.md`）：生产构建下大厅/白板/文档/联机/UI 原型/设置全量验证（桌面+375px、深浅色）；修复 Electron dev 硬编码 5173 端口导致端口被占时加载错误应用的缺陷（改用 `VITE_DEV_SERVER_URL`）。
 
 ---
 
