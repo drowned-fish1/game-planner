@@ -136,9 +136,9 @@ export function Settings() {
         <div className="mx-auto max-w-4xl space-y-8">
             {/* AI 配置板块 */}
             <section>
-                <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2 className="flex items-center gap-2 text-xl font-bold"><Sparkles size={20} className="text-iris-400"/> AI 服务配置</h2>
-                    <button onClick={addConfig} className="btn-outline text-sm">
+                    <button onClick={addConfig} className="btn-outline shrink-0 text-sm">
                         <Plus size={16} /> 新增服务
                     </button>
                 </div>

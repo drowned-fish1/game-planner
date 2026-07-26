@@ -111,7 +111,13 @@ export function UICanvas({
   };
 
   const handleContextMenu = (e: React.MouseEvent | MouseEvent, id: string) => {
-    const ev = e as any; setContextMenu({ x: ev.clientX, y: ev.clientY, componentId: id });
+    const ev = e as any;
+    // 钳制到视口内，避免窄屏上 w-36 菜单溢出屏幕外
+    setContextMenu({
+      x: Math.min(ev.clientX, window.innerWidth - 152),
+      y: Math.min(ev.clientY, window.innerHeight - 140),
+      componentId: id,
+    });
   };
 
   const deleteComponent = (id: string) => {
@@ -183,12 +189,12 @@ export function UICanvas({
       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
 
       {/* 顶部工具栏 */}
-      <div className="h-14 bg-surface border-b border-line flex items-center justify-between px-4 shrink-0 z-20">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-surface-3 rounded-lg text-content" title="返回页面列表" aria-label="返回页面列表"><ArrowLeft size={20} /></button>
-          <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="bg-transparent text-white font-bold outline-none border-b border-transparent focus:border-iris-500 px-1" />
+      <div className="h-14 bg-surface border-b border-line flex items-center justify-between gap-2 px-2 sm:px-4 shrink-0 z-20">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+          <button onClick={onBack} className="shrink-0 p-2 hover:bg-surface-3 rounded-lg text-content" title="返回页面列表" aria-label="返回页面列表"><ArrowLeft size={20} /></button>
+          <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="min-w-0 flex-1 max-w-[240px] bg-transparent text-white font-bold outline-none border-b border-transparent focus:border-iris-500 px-1" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
            <button onClick={() => addItem('text')} className="p-2 hover:bg-surface-3 rounded text-content" title="添加文本" aria-label="添加文本"><Type size={18}/></button>
            <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-surface-3 rounded text-content" title="上传媒体" aria-label="上传媒体"><Upload size={18}/></button>
            <button onClick={exportAsImage} className="p-2 hover:bg-blue-600 bg-blue-700 rounded text-white" title="导出" aria-label="导出为图片"><Image size={18}/></button>
@@ -197,7 +203,7 @@ export function UICanvas({
 
       <div className="flex-1 flex overflow-hidden">
         {/* 画布区域 */}
-        <div className="flex-1 bg-[#0f0f0f] relative overflow-auto flex p-10 custom-scrollbar">
+        <div className="flex-1 bg-[#0f0f0f] relative overflow-auto flex p-4 md:p-10 custom-scrollbar">
            <div className="min-w-full min-h-full flex items-center justify-center pointer-events-none">
              <div 
                ref={captureRef}

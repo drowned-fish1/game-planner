@@ -359,7 +359,7 @@ export function TeamManager({
                 </button>
 
                 {collaboration.connectionState === 'connected' && (
-                  <div className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-xs text-brand-200">
+                  <div className="break-all rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-xs text-brand-200">
                     当前房间：{collaboration.roomId} · {collaboration.mode === 'host' ? '你是房主' : '你已加入远程房间'}
                   </div>
                 )}
@@ -433,7 +433,7 @@ export function TeamManager({
                   <div key={`${peer.address}-${room.id}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg/60 p-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-white">{room.projectName || room.id}</div>
-                      <div className="mt-1 text-xs text-muted">
+                      <div className="mt-1 break-all text-xs text-muted">
                         设备 {peer.deviceName} · 地址 {peer.address}:{peer.service?.port || '-'} · 房间号 {room.id}
                       </div>
                       <div className="mt-1 text-xs text-subtle">
@@ -562,7 +562,7 @@ export function TeamManager({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {members.map((member) => (
             <div
               key={member.id}
@@ -626,9 +626,9 @@ export function TeamManager({
 
       <div className="hidden min-h-0 flex-1 overflow-hidden md:grid md:grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div className="min-h-0 overflow-hidden border-b border-line">{roomPanel}</div>
-        <div className="grid min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid min-h-0 overflow-hidden grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-1">
           <div className="min-h-0 overflow-hidden">{membersPanel}</div>
-          <div className="min-h-0 overflow-hidden border-l border-line">{todosPanel}</div>
+          <div className="min-h-0 overflow-hidden border-t border-line lg:border-l lg:border-t-0">{todosPanel}</div>
         </div>
       </div>
 
