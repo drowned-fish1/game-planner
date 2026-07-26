@@ -32,6 +32,14 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
     }
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleRunAI = async (inputContent: string) => {
     setError('');
     setResult('');
@@ -60,7 +68,7 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
             <Sparkles size={18} />
             <span className="font-bold text-sm uppercase tracking-wider">AI Assistant - {mode.toUpperCase()}</span>
           </div>
-          <button onClick={onClose}><X size={18} className="text-subtle hover:text-white" /></button>
+          <button onClick={onClose} title="关闭" aria-label="关闭"><X size={18} className="text-subtle hover:text-white" /></button>
         </div>
 
         {/* Body */}
