@@ -10,9 +10,11 @@ import {
   MoreVertical,
   ArrowUpDown,
   Copy,
+  Download,
+  Upload,
 } from 'lucide-react';
 // 只引用 getProjectsList 和 saveProjectsList，不再引用 getWorkspaceData
-import { getProjectsList, saveProjectsList, loadProjectContent, saveProjectContent, ProjectMeta } from '../../utils/storage';
+import { getProjectsList, saveProjectsList, loadProjectContent, saveProjectContent, exportProject, importProject, ProjectMeta } from '../../utils/storage';
 import { toast } from '../../utils/toast';
 import { confirmDialog } from '../../utils/confirm';
 
@@ -43,6 +45,7 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
     () => ((localStorage.getItem('gp_dash_sort') as SortMode) || 'recent'),
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; targetId: string }>({
@@ -110,11 +113,50 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
     toast.success('已创建副本');
   };
 
+  // 导出项目为 .json 文件
+  const handleExportProject = () => {
+    const target = projects.find((p) => p.id === contextMenu.targetId);
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    if (!target) return;
+    const data = exportProject(target.id);
+    if (!data) {
+      toast.error('导出失败：项目数据不存在');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${target.name || '项目'}.gp-project.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`已导出「${target.name}」`);
+  };
+
+  // 从 .json 文件导入项目
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const meta = importProject(ev.target?.result as string);
+        setProjects(getProjectsList());
+        toast.success(`已导入「${meta.name}」`);
+      } catch (err: any) {
+        toast.error(`导入失败：${err?.message || '未知错误'}`);
+      }
+    };
+    reader.onerror = () => toast.error('导入失败：文件读取出错');
+    reader.readAsText(file);
+  };
+
   // 右键逻辑
   const openMenuAt = (x: number, y: number, id: string) => {
     // clamp so the menu stays on-screen
     const menuW = 160;
-    const menuH = 132;
+    const menuH = 172;
     const clampedX = Math.min(x, window.innerWidth - menuW - 8);
     const clampedY = Math.min(y, window.innerHeight - menuH - 8);
     setContextMenu({ visible: true, x: clampedX, y: clampedY, targetId: id });
@@ -187,6 +229,7 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
       </div>
 
       <input type="file" ref={fileInputRef} onChange={handleCoverUpload} className="hidden" accept="image/*" />
+      <input type="file" ref={importInputRef} onChange={handleImportFile} className="hidden" accept=".json,application/json" />
 
       {/* Header */}
       <header className="relative z-10 shrink-0 px-6 pt-8 md:px-10 md:pt-10">
@@ -221,6 +264,15 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
             >
               <ArrowUpDown size={15} />
               {sortMode === 'recent' ? '最近编辑' : '名称'}
+            </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              title="从导出的 .json 文件导入项目"
+              aria-label="导入项目"
+              className="btn-outline whitespace-nowrap"
+            >
+              <Upload size={15} />
+              <span className="hidden md:inline">导入</span>
             </button>
           </div>
         </div>
@@ -351,6 +403,13 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
           >
             <Copy size={15} className="text-muted" />
             创建副本
+          </button>
+          <button
+            onClick={handleExportProject}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-content transition-colors hover:bg-surface-3"
+          >
+            <Download size={15} className="text-muted" />
+            导出项目
           </button>
           <button
             onClick={deleteProject}

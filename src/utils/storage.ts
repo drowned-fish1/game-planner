@@ -237,12 +237,68 @@ export const loadProjectContent = (projectId: string): ProjectContent => {
 export const saveProjectContent = (projectId: string, content: ProjectContent) => {
   const store = loadGlobalStore();
   store.contents[projectId] = content;
-  
+
   // 同时更新列表里的修改时间
   const idx = store.projects.findIndex(p => p.id === projectId);
   if (idx !== -1) {
     store.projects[idx].lastModified = Date.now();
   }
-  
+
   saveGlobalStore(store);
+};
+
+// ==========================================
+// 4. 项目导入 / 导出
+// ==========================================
+
+export interface ProjectExportFile {
+  format: 'game-planner-project';
+  version: 1;
+  exportedAt: number;
+  meta: ProjectMeta;
+  content: ProjectContent;
+}
+
+export const exportProject = (projectId: string): ProjectExportFile | null => {
+  const store = loadGlobalStore();
+  const meta = store.projects.find(p => p.id === projectId);
+  if (!meta) return null;
+  return {
+    format: 'game-planner-project',
+    version: 1,
+    exportedAt: Date.now(),
+    meta: { ...meta },
+    content: loadProjectContent(projectId),
+  };
+};
+
+// 解析导出文件并作为新项目导入（新 id、深拷贝内容）。格式不对时抛出中文错误信息。
+export const importProject = (raw: string): ProjectMeta => {
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error('文件不是有效的 JSON');
+  }
+
+  if (!data || data.format !== 'game-planner-project' || !data.meta || !data.content) {
+    throw new Error('文件不是 Game Planner 的项目导出文件');
+  }
+
+  const newMeta: ProjectMeta = {
+    id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `import-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    name: typeof data.meta.name === 'string' && data.meta.name.trim() ? data.meta.name : '导入的项目',
+    cover: typeof data.meta.cover === 'string' ? data.meta.cover : '',
+    lastModified: Date.now(),
+  };
+
+  const content: ProjectContent = JSON.parse(JSON.stringify(data.content));
+
+  const store = loadGlobalStore();
+  store.projects = [newMeta, ...store.projects];
+  store.contents[newMeta.id] = content;
+  saveGlobalStore(store);
+  return newMeta;
 };
