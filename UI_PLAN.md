@@ -100,6 +100,7 @@
 23. 浅色主题：主题令牌、切换入口与本地偏好持久化。
 24. 质量门禁：pre-commit 执行 TypeScript、ESLint 和单元测试；补齐 `storage` 与 `normalizeRoomServerUrl` 关键路径测试。
 25. 全链路回归（见 `REGRESSION_CHECKLIST.md`）：生产构建下大厅/白板/文档/联机/UI 原型/设置全量验证（桌面+375px、深浅色）；修复 Electron dev 硬编码 5173 端口导致端口被占时加载错误应用的缺陷（改用 `VITE_DEV_SERVER_URL`）。
+26. 协作健壮性：修复 connect Promise 在 joined 前 close/error/超时时永久挂起；异常断线自动重连（指数退避+上限+抖动，成功后重置，`getLatestSnapshot` 让房主重启后用最新内容重建房间）；手动退出取消一切定时器与重连；代号(generation)机制防重复连接/重复监听/重复 disconnected。纯逻辑拆到 `utils/roomConnection.ts`（退避/判定/解析 12 用例），`RoomClient` 支持注入 Fake WebSocket/假定时器（9 用例）；`scripts/verify-collab.mjs` 用两个真实客户端对接真实 CollabServer 验证加入/同步/断网/服务重启/恢复/退出，浏览器 UI 亦实测断线重连全流程。
 
 ---
 
@@ -121,7 +122,7 @@
 - ~~**[浅色主题]**~~ ✅ 已完成（迭代 23）
 
 ### P3 — 工程化
-- **[协作健壮性（需联机测试）]** `utils/collaboration.ts`：早期 `close`/断线时 reject 挂起的 connect Promise；断线自动重连（带退避）。**务必在真实联机环境验证**。
+- ~~**[协作健壮性（需联机测试）]**~~ ✅ 已完成（迭代 26，真实双客户端 + 浏览器 UI 联机验证）
 - **[i18n]** 抽离中文文案到字典，为将来多语言铺路。
 - ~~**[质量门禁]**~~ ✅ 已完成（迭代 24）
 

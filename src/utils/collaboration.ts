@@ -1,5 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ProjectContent } from './storage';
+import {
+  DEFAULT_RECONNECT_POLICY,
+  REALTIME_TIMERS,
+  WS_OPEN,
+  computeReconnectDelay,
+  parseRoomMessage,
+  shouldScheduleReconnect,
+  type ReconnectPolicy,
+  type TimerApi,
+  type WebSocketLike,
+} from './roomConnection';
 
 const PROFILE_STORAGE_KEY = 'gp_collab_profile';
 const PROFILE_COLORS = ['#10b981', '#f97316', '#0ea5e9', '#eab308', '#ef4444', '#8b5cf6', '#14b8a6'];
@@ -96,11 +107,6 @@ export interface LanDiscoveredPeer {
   rooms: LanRoomSummary[];
 }
 
-interface CollaborationMessage<T = unknown> {
-  type: string;
-  payload: T;
-}
-
 interface RoomClientHandlers {
   onJoined?: (payload: {
     connectionId: string;
@@ -115,7 +121,12 @@ interface RoomClientHandlers {
   onContent?: (payload: { snapshot: ProjectContent; revision: number; actorId: string; updatedAt: number }) => void;
   onActivity?: (payload: RoomActivity) => void;
   onError?: (message: string) => void;
+  /** 最终断开：主动退出不会触发；自动重连只在放弃后触发一次 */
   onDisconnected?: (reason?: string) => void;
+  /** 每次安排自动重连时通知（UI 可展示“正在重连”） */
+  onReconnecting?: (info: { attempt: number; maxAttempts: number; delayMs: number }) => void;
+  /** 重连时刷新加入快照（服务重启后房主用最新内容重建房间）；仅当首次加入携带快照时使用 */
+  getLatestSnapshot?: () => ProjectContent | undefined;
 }
 
 interface ProxyEventEnvelope {
@@ -294,214 +305,82 @@ export function buildPeerServerUrl(peer: LanDiscoveredPeer) {
   return port ? `ws://${peer.address}:${port}/ws` : '';
 }
 
+export interface RoomClientOptions {
+  reconnect?: Partial<ReconnectPolicy>;
+  /** 等待服务端 joined 回执的超时（毫秒），超时按连接失败处理 */
+  connectTimeoutMs?: number;
+  /** 可注入的定时器/随机数/socket 工厂，测试用；生产用默认值 */
+  timers?: TimerApi;
+  random?: () => number;
+  createSocket?: (url: string) => WebSocketLike;
+}
+
+interface JoinedPayload {
+  connectionId: string;
+  roomId: string;
+  revision: number;
+  snapshot?: ProjectContent;
+  participants: RoomParticipant[];
+  activityLog: RoomActivity[];
+  service?: CollaborationServiceInfo;
+}
+
+const DEFAULT_CONNECT_TIMEOUT_MS = 10000;
+
 export class RoomClient {
   private readonly url: string;
   private readonly handlers: RoomClientHandlers;
-  private socket: WebSocket | null = null;
+  private readonly policy: ReconnectPolicy;
+  private readonly connectTimeoutMs: number;
+  private readonly timers: TimerApi;
+  private readonly random: () => number;
+  private readonly createSocket: (url: string) => WebSocketLike;
+
+  private socket: WebSocketLike | null = null;
   private clientId: string | null = null;
   private unsubProxy: (() => void) | null = null;
   private closedByUser = false;
+  private everConnected = false;
+  private attemptsMade = 0;
+  private joinOptions: JoinRoomOptions | null = null;
+  private reconnectTimer: unknown = null;
+  private joinTimeoutTimer: unknown = null;
+  /** 每次建立传输 +1；旧 socket/proxy 的迟到事件按代号丢弃，防重复回调 */
+  private generation = 0;
   private connectedResolver: ((value: unknown) => void) | null = null;
   private connectedRejecter: ((reason?: unknown) => void) | null = null;
   public connectionId: string | null = null;
 
-  constructor(url: string, handlers: RoomClientHandlers) {
+  constructor(url: string, handlers: RoomClientHandlers, options: RoomClientOptions = {}) {
     this.url = url;
     this.handlers = handlers;
+    this.policy = { ...DEFAULT_RECONNECT_POLICY, ...options.reconnect };
+    this.connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
+    this.timers = options.timers ?? REALTIME_TIMERS;
+    this.random = options.random ?? Math.random;
+    this.createSocket = options.createSocket ?? ((url) => new WebSocket(url) as unknown as WebSocketLike);
   }
 
   connect(options: JoinRoomOptions) {
     this.closedByUser = false;
-    return hasDesktopProxy() ? this.connectViaElectron(options) : this.connectViaBrowser(options);
-  }
-
-  private async connectViaElectron(options: JoinRoomOptions) {
-    const api = getElectronAPI();
-    if (!api?.invoke) {
-      throw new Error('Electron collaboration proxy unavailable');
-    }
-
-    // 有意为之：executor 内 await IPC 并把 resolve/reject 交给消息回调，重构需联机验证，暂保留
-    // eslint-disable-next-line no-async-promise-executor
-    return new Promise(async (resolve, reject) => {
-      this.connectedResolver = resolve;
-      this.connectedRejecter = reject;
-
-      try {
-        const { clientId } = await api.invoke<{ clientId: string }>('collab:proxy-connect', {
-          url: this.url,
-          joinPayload: options,
-        });
-
-        this.clientId = clientId;
-        this.unsubProxy = subscribeProxyClient(clientId, (type, payload) => {
-          this.handleProxyEvent(type, payload);
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to connect to room server';
-        this.handlers.onError?.(message);
-        this.connectedRejecter?.(new Error(message));
-        this.connectedResolver = null;
-        this.connectedRejecter = null;
-      }
-    });
-  }
-
-  private handleProxyEvent(type: string, payload: unknown) {
-    switch (type) {
-      case 'joined': {
-        const joinedPayload = payload as {
-          connectionId: string;
-          roomId: string;
-          revision: number;
-          snapshot?: ProjectContent;
-          participants: RoomParticipant[];
-          activityLog: RoomActivity[];
-          service?: CollaborationServiceInfo;
-        };
-
-        this.connectionId = joinedPayload.connectionId;
-        this.handlers.onJoined?.(joinedPayload);
-        this.connectedResolver?.(joinedPayload);
-        this.connectedResolver = null;
-        this.connectedRejecter = null;
-        break;
-      }
-      case 'room:presence':
-        this.handlers.onPresence?.(payload as { participants: RoomParticipant[]; revision: number });
-        break;
-      case 'room:update-content':
-        this.handlers.onContent?.(payload as { snapshot: ProjectContent; revision: number; actorId: string; updatedAt: number });
-        break;
-      case 'room:activity':
-        this.handlers.onActivity?.(payload as RoomActivity);
-        break;
-      case 'room:error': {
-        const errorPayload = payload as { message?: string };
-        const message = errorPayload?.message || 'Room error';
-        this.handlers.onError?.(message);
-        this.connectedRejecter?.(new Error(message));
-        this.connectedResolver = null;
-        this.connectedRejecter = null;
-        break;
-      }
-      case 'disconnected': {
-        const disconnectedPayload = payload as { reason?: string };
-        if (!this.closedByUser) {
-          this.handlers.onDisconnected?.(disconnectedPayload?.reason || 'Connection closed');
-        }
-        this.cleanupProxy();
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  private connectViaBrowser(options: JoinRoomOptions) {
-    return new Promise((resolve, reject) => {
-      this.connectedResolver = resolve;
-      this.connectedRejecter = reject;
-
-      let socket: WebSocket;
-      try {
-        socket = new WebSocket(this.url);
-      } catch (error) {
-        const errorMessage = buildSocketCreationErrorMessage(error);
-        this.handlers.onError?.(errorMessage);
-        this.connectedRejecter?.(new Error(errorMessage));
-        this.connectedResolver = null;
-        this.connectedRejecter = null;
-        return;
-      }
-
-      this.socket = socket;
-
-      socket.onopen = () => {
-        this.send('join', options);
-      };
-
-      socket.onmessage = (event) => {
-        let message: CollaborationMessage;
-        try {
-          message = JSON.parse(String(event.data)) as CollaborationMessage;
-        } catch (error) {
-          console.error('Failed to parse room message:', error);
-          return;
-        }
-
-        switch (message.type) {
-          case 'joined': {
-            const payload = message.payload as {
-              connectionId: string;
-              roomId: string;
-              revision: number;
-              snapshot?: ProjectContent;
-              participants: RoomParticipant[];
-              activityLog: RoomActivity[];
-              service?: CollaborationServiceInfo;
-            };
-
-            this.connectionId = payload.connectionId;
-            this.handlers.onJoined?.(payload);
-            this.connectedResolver?.(payload);
-            this.connectedResolver = null;
-            this.connectedRejecter = null;
-            break;
-          }
-          case 'room:presence':
-            this.handlers.onPresence?.(message.payload as { participants: RoomParticipant[]; revision: number });
-            break;
-          case 'room:update-content':
-            this.handlers.onContent?.(message.payload as { snapshot: ProjectContent; revision: number; actorId: string; updatedAt: number });
-            break;
-          case 'room:activity':
-            this.handlers.onActivity?.(message.payload as RoomActivity);
-            break;
-          case 'room:error': {
-            const errorPayload = message.payload as { message?: string };
-            const errorMessage = errorPayload.message || 'Room error';
-            this.handlers.onError?.(errorMessage);
-            this.connectedRejecter?.(new Error(errorMessage));
-            this.connectedResolver = null;
-            this.connectedRejecter = null;
-            break;
-          }
-          default:
-            break;
-        }
-      };
-
-      socket.onerror = () => {
-        const errorMessage = 'Unable to connect to room server';
-        this.handlers.onError?.(errorMessage);
-        this.connectedRejecter?.(new Error(errorMessage));
-        this.connectedResolver = null;
-        this.connectedRejecter = null;
-      };
-
-      socket.onclose = (event) => {
-        this.socket = null;
-        this.connectionId = null;
-        if (!this.closedByUser) {
-          this.handlers.onDisconnected?.(event.reason || 'Connection closed');
-        }
-      };
-    });
+    this.everConnected = false;
+    this.attemptsMade = 0;
+    this.joinOptions = options;
+    // 重复 connect：静默丢弃旧传输与挂起的旧 Promise（不触发 onDisconnected），
+    // 防重复连接、重复监听与 Promise 泄漏
+    this.clearReconnectTimer();
+    this.clearJoinTimeout();
+    this.settleReject(new Error('已被新的连接请求取代'));
+    this.teardownTransport();
+    return this.openTransport(options);
   }
 
   disconnect() {
     this.closedByUser = true;
-
-    if (this.clientId && hasDesktopProxy()) {
-      getElectronAPI()?.invoke('collab:proxy-disconnect', { clientId: this.clientId });
-      this.cleanupProxy();
-      return;
-    }
-
-    this.socket?.close(1000, 'Client disconnect');
-    this.socket = null;
-    this.connectionId = null;
+    this.clearReconnectTimer();
+    this.clearJoinTimeout();
+    this.settleReject(new Error('已主动断开连接'));
+    this.teardownTransport(1000, 'Client disconnect');
   }
 
   sendPresenceUpdate(payload: { activeModule: string; status: string; focusedItemId?: string | null }) {
@@ -516,6 +395,277 @@ export class RoomClient {
     this.send('activity:event', payload);
   }
 
+  // ===== 连接建立 =====
+
+  private openTransport(options: JoinRoomOptions): Promise<unknown> {
+    return hasDesktopProxy() ? this.connectViaElectron(options) : this.connectViaBrowser(options);
+  }
+
+  private connectViaBrowser(options: JoinRoomOptions) {
+    const generation = ++this.generation;
+
+    return new Promise((resolve, reject) => {
+      this.connectedResolver = resolve;
+      this.connectedRejecter = reject;
+
+      let socket: WebSocketLike;
+      try {
+        socket = this.createSocket(this.url);
+      } catch (error) {
+        const errorMessage = buildSocketCreationErrorMessage(error);
+        this.handlers.onError?.(errorMessage);
+        this.settleReject(new Error(errorMessage));
+        return;
+      }
+
+      this.socket = socket;
+      this.armJoinTimeout(generation);
+
+      // 一次性闩锁：底层实现若重复触发 close，只处理第一次，防重复 disconnected/重复调度
+      let closeHandled = false;
+
+      socket.onopen = () => {
+        if (generation !== this.generation) return;
+        this.rawSend('join', options);
+      };
+
+      socket.onmessage = (event) => {
+        if (generation !== this.generation) return;
+        const message = parseRoomMessage(typeof event.data === 'string' ? event.data : String(event.data));
+        if (!message) {
+          console.error('Failed to parse room message');
+          return;
+        }
+        this.handleRoomEvent(message.type, message.payload);
+      };
+
+      socket.onerror = () => {
+        if (generation !== this.generation) return;
+        // 只做 UI 通知；settle 与重连统一收敛到 onclose（浏览器保证 error 后必有 close），
+        // 避免 error+close 双路径造成重复 reject / 重复调度
+        if (this.connectedRejecter) {
+          this.handlers.onError?.('Unable to connect to room server');
+        }
+      };
+
+      socket.onclose = (event) => {
+        if (generation !== this.generation || closeHandled) return;
+        closeHandled = true;
+        this.socket = null;
+        this.connectionId = null;
+        this.handleTransportClosed(event?.reason || undefined);
+      };
+    });
+  }
+
+  private async connectViaElectron(options: JoinRoomOptions): Promise<unknown> {
+    const api = getElectronAPI();
+    if (!api?.invoke) {
+      throw new Error('Electron collaboration proxy unavailable');
+    }
+
+    const generation = ++this.generation;
+    const joined = new Promise((resolve, reject) => {
+      this.connectedResolver = resolve;
+      this.connectedRejecter = reject;
+    });
+
+    this.armJoinTimeout(generation);
+
+    try {
+      const { clientId } = await api.invoke<{ clientId: string }>('collab:proxy-connect', {
+        url: this.url,
+        joinPayload: options,
+      });
+
+      if (generation !== this.generation || this.closedByUser) {
+        // 等待 IPC 期间被更新的连接替代 / 被手动断开：丢弃这条代理连接
+        api.invoke('collab:proxy-disconnect', { clientId });
+      } else {
+        this.clientId = clientId;
+        this.unsubProxy = subscribeProxyClient(clientId, (type, payload) => {
+          if (generation !== this.generation) return;
+          if (type === 'disconnected') {
+            const reason = (payload as { reason?: string } | null)?.reason;
+            this.cleanupProxy();
+            this.handleTransportClosed(reason || undefined);
+            return;
+          }
+          this.handleRoomEvent(type, payload);
+        });
+      }
+    } catch (error) {
+      if (generation === this.generation) {
+        const message = error instanceof Error ? error.message : 'Unable to connect to room server';
+        this.handlers.onError?.(message);
+        this.settleReject(new Error(message));
+      }
+    }
+
+    return joined;
+  }
+
+  // ===== 事件处理 =====
+
+  private handleRoomEvent(type: string, payload: unknown) {
+    switch (type) {
+      case 'joined': {
+        const joinedPayload = payload as JoinedPayload;
+        this.everConnected = true;
+        this.attemptsMade = 0;
+        this.clearJoinTimeout();
+        this.connectionId = joinedPayload.connectionId;
+        this.handlers.onJoined?.(joinedPayload);
+        this.settleResolve(joinedPayload);
+        break;
+      }
+      case 'room:presence':
+        this.handlers.onPresence?.(payload as { participants: RoomParticipant[]; revision: number });
+        break;
+      case 'room:update-content':
+        this.handlers.onContent?.(payload as { snapshot: ProjectContent; revision: number; actorId: string; updatedAt: number });
+        break;
+      case 'room:activity':
+        this.handlers.onActivity?.(payload as RoomActivity);
+        break;
+      case 'room:error': {
+        const message = (payload as { message?: string } | null)?.message || 'Room error';
+        this.handlers.onError?.(message);
+        this.settleReject(new Error(message));
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** 传输层关闭（浏览器 onclose / 代理 disconnected）后的统一分支 */
+  private handleTransportClosed(reason?: string) {
+    this.clearJoinTimeout();
+
+    if (this.connectedRejecter) {
+      // 尚未收到 joined 就被关闭：让挂起的 connect 立即失败（原实现会永久挂起）。
+      // 首次连接由调用方 catch 处理；重连尝试由 scheduleReconnect 的 catch 续排，
+      // 这里不再调度，保证重连只有一个调度入口。
+      this.settleReject(new Error(reason || 'Connection closed before join completed'));
+      return;
+    }
+
+    if (this.closedByUser) return;
+
+    if (shouldScheduleReconnect(this.reconnectContext(), this.policy)) {
+      this.scheduleReconnect();
+      return;
+    }
+
+    if (this.everConnected) {
+      this.handlers.onDisconnected?.(reason || 'Connection closed');
+    }
+  }
+
+  // ===== 自动重连 =====
+
+  private reconnectContext() {
+    return {
+      closedByUser: this.closedByUser,
+      everConnected: this.everConnected,
+      attemptsMade: this.attemptsMade,
+    };
+  }
+
+  private scheduleReconnect() {
+    this.attemptsMade += 1;
+    const delayMs = computeReconnectDelay(this.attemptsMade, this.policy, this.random);
+    this.handlers.onReconnecting?.({ attempt: this.attemptsMade, maxAttempts: this.policy.maxAttempts, delayMs });
+
+    this.reconnectTimer = this.timers.setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.closedByUser || !this.joinOptions) return;
+
+      this.openTransport(this.refreshedJoinOptions()).catch(() => {
+        if (this.closedByUser) return;
+        if (shouldScheduleReconnect(this.reconnectContext(), this.policy)) {
+          this.scheduleReconnect();
+        } else {
+          this.handlers.onDisconnected?.('自动重连失败，已停止重试');
+        }
+      });
+    }, delayMs);
+  }
+
+  /** 重连时刷新快照：服务重启导致房间丢失时，房主用最新内容重建房间 */
+  private refreshedJoinOptions(): JoinRoomOptions {
+    const base = this.joinOptions as JoinRoomOptions;
+    if (base.snapshot === undefined) return base;
+    const latest = this.handlers.getLatestSnapshot?.();
+    return latest ? { ...base, snapshot: latest } : base;
+  }
+
+  // ===== 内部工具 =====
+
+  private armJoinTimeout(generation: number) {
+    this.clearJoinTimeout();
+    this.joinTimeoutTimer = this.timers.setTimeout(() => {
+      this.joinTimeoutTimer = null;
+      if (generation !== this.generation) return;
+      const message = '连接超时：服务器未在限定时间内确认加入';
+      this.handlers.onError?.(message);
+      // 先拆传输再 reject：teardown 递增代号，使半开 socket 的迟到 onclose 失效；
+      // 重连续排交给 connect/reconnect 的 catch，避免双重调度
+      this.teardownTransport(undefined, 'join timeout');
+      this.settleReject(new Error(message));
+    }, this.connectTimeoutMs);
+  }
+
+  private clearJoinTimeout() {
+    if (this.joinTimeoutTimer !== null) {
+      this.timers.clearTimeout(this.joinTimeoutTimer);
+      this.joinTimeoutTimer = null;
+    }
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer !== null) {
+      this.timers.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  private settleResolve(value: unknown) {
+    const resolve = this.connectedResolver;
+    this.connectedResolver = null;
+    this.connectedRejecter = null;
+    resolve?.(value);
+  }
+
+  private settleReject(error: Error) {
+    const reject = this.connectedRejecter;
+    this.connectedResolver = null;
+    this.connectedRejecter = null;
+    reject?.(error);
+  }
+
+  /** 静默拆除当前传输：递增代号让迟到事件全部失效 */
+  private teardownTransport(code?: number, reason?: string) {
+    this.generation += 1;
+
+    if (this.clientId && hasDesktopProxy()) {
+      getElectronAPI()?.invoke('collab:proxy-disconnect', { clientId: this.clientId });
+      this.cleanupProxy();
+    }
+
+    if (this.socket) {
+      const socket = this.socket;
+      this.socket = null;
+      try {
+        socket.close(code, reason);
+      } catch {
+        // 已关闭的 socket 再 close 抛错可忽略
+      }
+    }
+    this.connectionId = null;
+  }
+
   private send(type: string, payload: unknown) {
     if (this.clientId && hasDesktopProxy()) {
       getElectronAPI()?.invoke('collab:proxy-send', {
@@ -525,8 +675,11 @@ export class RoomClient {
       });
       return;
     }
+    this.rawSend(type, payload);
+  }
 
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+  private rawSend(type: string, payload: unknown) {
+    if (!this.socket || this.socket.readyState !== WS_OPEN) return;
     this.socket.send(JSON.stringify({ type, payload }));
   }
 

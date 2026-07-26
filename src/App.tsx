@@ -34,6 +34,7 @@ import {
   type CollaborationProfile,
   type RoomActivity,
 } from './utils/collaboration';
+import { describeReconnectAttempt } from './utils/roomConnection';
 
 type ModuleType = 'brainstorm' | 'docs' | 'team' | 'ui' | 'settings';
 
@@ -258,6 +259,14 @@ function App() {
           error: message,
         }));
       },
+      onReconnecting: ({ attempt, maxAttempts }) => {
+        setCollaboration((prev) => ({
+          ...prev,
+          connectionState: 'connecting',
+          error: describeReconnectAttempt(attempt, maxAttempts),
+        }));
+      },
+      getLatestSnapshot: () => projectContentRef.current ?? undefined,
       onDisconnected: (reason) => {
         if (roomClientRef.current === client) {
           roomClientRef.current = null;
