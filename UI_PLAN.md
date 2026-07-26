@@ -73,7 +73,7 @@
 
 ---
 
-## 3. 已完成（迭代 1–12）
+## 3. 已完成（迭代 1–24）
 
 1. 设计系统：`tailwind.config.js` + `src/index.css`（令牌、字体、阴影、滚动条、焦点环、原语）。
 2. 应用外壳 `App.tsx`（侧栏/顶栏/移动导航/保存状态）——仅改表现，协作逻辑原样保留。
@@ -96,6 +96,9 @@
 19. 项目导入/导出：`storage.exportProject/importProject`（format/version 校验、新 id 深拷贝），Dashboard 顶栏「导入」+ 右键「导出项目」，合法/非法文件路径均实测。
 20. 命令面板（Ctrl+K，搜索/方向键/Enter）与快捷键帮助（?）：`CommandPalette.tsx` + `ShortcutHelp.tsx`，App 集成（输入框聚焦时 ? 不触发），全链路实测。
 21. 遗留配色迁移（AI 卡 purple→iris 等、Board 导出底色/网格点/连线色、UIPrototype 常量化）；**修复状态磁贴无法移动/删除**（此前不渲染拖拽栏，现覆盖式 h-6 栏）。
+22. 白板多选与对齐：框选、批量移动/删除、基础对齐吸附。
+23. 浅色主题：主题令牌、切换入口与本地偏好持久化。
+24. 质量门禁：pre-commit 执行 TypeScript、ESLint 和单元测试；补齐 `storage` 与 `normalizeRoomServerUrl` 关键路径测试。
 
 ---
 
@@ -112,14 +115,14 @@
 
 ### P2 — 功能增量
 - ~~**[项目导入/导出]**~~ ✅ 已完成（迭代 19）
-- **[白板多选与对齐]** `Board.tsx`：框选、批量移动/删除、基础对齐吸附。风险中，注意 `onDataChange` 回传结构不变。
+- ~~**[白板多选与对齐]**~~ ✅ 已完成（迭代 22）
 - ~~**[命令面板 / 快捷键帮助]**~~ ✅ 已完成（迭代 20）
-- **[浅色主题]** 令牌已就绪：在 `index.css` 增加 `:root.light { --bg…}` 覆盖，`App`/`Settings` 加主题切换并存 localStorage；`html` 上切 `light`/`dark` 类。
+- ~~**[浅色主题]**~~ ✅ 已完成（迭代 23）
 
 ### P3 — 工程化
 - **[协作健壮性（需联机测试）]** `utils/collaboration.ts`：早期 `close`/断线时 reject 挂起的 connect Promise；断线自动重连（带退避）。**务必在真实联机环境验证**。
 - **[i18n]** 抽离中文文案到字典，为将来多语言铺路。
-- **[质量门禁]** 引入 `tsc --noEmit` + `eslint` 到提交前脚本；补关键工具函数（storage、collaboration.normalizeRoomServerUrl）单测。
+- ~~**[质量门禁]**~~ ✅ 已完成（迭代 24）
 
 ---
 
@@ -130,6 +133,7 @@ npm install            # 首次
 npm run dev            # 本地开发预览（Vite）
 npm run build          # tsc 类型检查 + vite 打包 —— 每轮迭代后必跑
 npm run lint           # ESLint
+npm test               # storage / collaboration 工具函数单测
 npm run electron:build # 打 Windows 安装包（可选）
 ```
 

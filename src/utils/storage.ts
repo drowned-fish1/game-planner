@@ -280,7 +280,13 @@ export const importProject = (raw: string): ProjectMeta => {
     throw new Error('文件不是有效的 JSON');
   }
 
-  if (!data || data.format !== 'game-planner-project' || !data.meta || !data.content) {
+  if (
+    !data
+    || data.format !== 'game-planner-project'
+    || data.version !== 1
+    || !data.meta
+    || !data.content
+  ) {
     throw new Error('文件不是 Game Planner 的项目导出文件');
   }
 

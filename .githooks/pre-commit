@@ -8,4 +8,7 @@ npx tsc --noEmit || exit 1
 echo "[pre-commit] eslint ..."
 npm run --silent lint || exit 1
 
+echo "[pre-commit] unit tests ..."
+npm run --silent test || exit 1
+
 echo "[pre-commit] OK"
