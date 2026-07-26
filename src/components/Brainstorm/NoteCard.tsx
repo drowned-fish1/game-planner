@@ -390,7 +390,7 @@ export function NoteCard({
                     {isLoading ? (
                         <Loader2 size={12} className="animate-spin text-iris-400"/>
                     ) : (
-                        <button onClick={() => handleAISummarize('self')} className="text-iris-300 hover:text-white p-1" title="运行 AI 处理" aria-label="运行 AI 处理">
+                        <button onClick={() => handleAISummarize('self')} className="text-iris-300 hover:text-content p-1" title="运行 AI 处理" aria-label="运行 AI 处理">
                             <Play size={12} fill="currentColor" />
                         </button>
                     )}

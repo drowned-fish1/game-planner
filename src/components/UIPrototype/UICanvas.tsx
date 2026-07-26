@@ -193,7 +193,7 @@ export function UICanvas({
       <div className="h-14 bg-surface border-b border-line flex items-center justify-between gap-2 px-2 sm:px-4 shrink-0 z-20">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
           <button onClick={onBack} className="shrink-0 p-2 hover:bg-surface-3 rounded-lg text-content" title="返回页面列表" aria-label="返回页面列表"><ArrowLeft size={20} /></button>
-          <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="min-w-0 flex-1 max-w-[240px] bg-transparent text-white font-bold outline-none border-b border-transparent focus:border-iris-500 px-1" />
+          <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="min-w-0 flex-1 max-w-[240px] bg-transparent text-content font-bold outline-none border-b border-transparent focus:border-iris-500 px-1" />
         </div>
         <div className="flex shrink-0 gap-2">
            <button onClick={() => addItem('text')} className="p-2 hover:bg-surface-3 rounded text-content" title="添加文本" aria-label="添加文本"><Type size={18}/></button>
@@ -234,12 +234,12 @@ export function UICanvas({
       {/* 右键菜单 & 属性弹窗 */}
       {contextMenu && (
         <div className="fixed bg-surface border border-line-strong rounded shadow-xl py-1 w-36 z-[3000]" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => { setMovingComponentId(movingComponentId === contextMenu.componentId ? null : contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-white hover:bg-brand-600 transition-colors flex items-center gap-2">
+          <button onClick={() => { setMovingComponentId(movingComponentId === contextMenu.componentId ? null : contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-content hover:bg-brand-600 hover:text-white transition-colors flex items-center gap-2">
              {movingComponentId === contextMenu.componentId ? <Lock size={14} /> : <Move size={14} />}
              {movingComponentId === contextMenu.componentId ? '锁定位置' : '移动组件'}
           </button>
           <div className="h-px bg-surface-3 my-1"></div>
-          <button onClick={() => { setEditingComponentId(contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-white hover:bg-iris-600 transition-colors">⚙️ 属性设置</button>
+          <button onClick={() => { setEditingComponentId(contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-content hover:bg-iris-600 hover:text-white transition-colors">⚙️ 属性设置</button>
           <div className="h-px bg-surface-3 my-1"></div>
           <button onClick={() => deleteComponent(contextMenu.componentId)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-surface-3 transition-colors">🗑️ 删除</button>
         </div>

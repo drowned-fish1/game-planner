@@ -239,7 +239,7 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
               <Gamepad2 size={24} />
             </div>
             <div>
-              <h1 className="font-display text-3xl font-bold tracking-tight text-white md:text-4xl">
+              <h1 className="font-display text-3xl font-bold tracking-tight text-content md:text-4xl">
                 Game Planner <span className="text-gradient-brand">Pro</span>
               </h1>
               <p className="mt-0.5 text-sm text-muted">项目管理大厅 · 共 {projects.length} 个项目</p>

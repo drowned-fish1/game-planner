@@ -56,11 +56,11 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 bg-iris-600 rounded flex items-center justify-center text-white font-bold text-xs">CFG</div>
              <div>
-               <h3 className="text-white font-bold text-base">{name}</h3>
+               <h3 className="text-content font-bold text-base">{name}</h3>
                <p className="text-subtle text-[10px] uppercase">ID: {component.id.slice(0,6)}</p>
              </div>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-white" title="关闭" aria-label="关闭属性设置"><X size={20} /></button>
+          <button onClick={onClose} className="text-muted hover:text-content" title="关闭" aria-label="关闭属性设置"><X size={20} /></button>
         </div>
 
         {/* Tabs */}
@@ -87,14 +87,14 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
           {activeTab === 'prop' && (
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1"><label className="text-xs text-subtle font-bold">Name</label><input value={name} onChange={e => setName(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-2 py-1.5 text-white text-sm" /></div>
-                 <div className="space-y-1"><label className="text-xs text-brand-500 font-bold">Scale</label><input type="number" step="0.1" value={scale} onChange={e => setScale(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1.5 text-white text-sm" /></div>
+                 <div className="space-y-1"><label className="text-xs text-subtle font-bold">Name</label><input value={name} onChange={e => setName(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-2 py-1.5 text-content text-sm" /></div>
+                 <div className="space-y-1"><label className="text-xs text-brand-500 font-bold">Scale</label><input type="number" step="0.1" value={scale} onChange={e => setScale(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1.5 text-content text-sm" /></div>
               </div>
               <div className="grid grid-cols-4 gap-3">
-                 <div><label className="text-[10px] text-subtle font-bold block mb-1">X</label><input type="number" value={x} onChange={e => setX(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-white text-xs" /></div>
-                 <div><label className="text-[10px] text-subtle font-bold block mb-1">Y</label><input type="number" value={y} onChange={e => setY(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-white text-xs" /></div>
-                 <div><label className="text-[10px] text-subtle font-bold block mb-1">W</label><input type="number" value={w} onChange={e => setW(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-white text-xs" /></div>
-                 <div><label className="text-[10px] text-subtle font-bold block mb-1">H</label><input type="number" value={h} onChange={e => setH(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-white text-xs" /></div>
+                 <div><label className="text-[10px] text-subtle font-bold block mb-1">X</label><input type="number" value={x} onChange={e => setX(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-content text-xs" /></div>
+                 <div><label className="text-[10px] text-subtle font-bold block mb-1">Y</label><input type="number" value={y} onChange={e => setY(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-content text-xs" /></div>
+                 <div><label className="text-[10px] text-subtle font-bold block mb-1">W</label><input type="number" value={w} onChange={e => setW(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-content text-xs" /></div>
+                 <div><label className="text-[10px] text-subtle font-bold block mb-1">H</label><input type="number" value={h} onChange={e => setH(Number(e.target.value))} className="w-full bg-bg border border-line-strong rounded px-2 py-1 text-content text-xs" /></div>
               </div>
             </div>
           )}
@@ -103,8 +103,8 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
           {activeTab === 'inter' && (
             <div className="space-y-6">
               <div className="bg-surface-3/30 p-4 rounded-lg border border-line-strong">
-                <label className="flex items-center gap-2 text-sm text-white font-bold mb-3"><Zap size={16} className="text-yellow-500"/> 点击动作 (On Click)</label>
-                <select value={interType} onChange={e => setInterType(e.target.value as any)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-white text-sm focus:border-iris-500 outline-none">
+                <label className="flex items-center gap-2 text-sm text-content font-bold mb-3"><Zap size={16} className="text-yellow-500"/> 点击动作 (On Click)</label>
+                <select value={interType} onChange={e => setInterType(e.target.value as any)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-content text-sm focus:border-iris-500 outline-none">
                   <option value="none">无动作 (None)</option>
                   <option value="navigate">跳转页面 (Navigate)</option>
                   <option value="open_modal">打开弹窗 (Open Modal)</option>
@@ -120,7 +120,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
               {interType === 'navigate' && (
                 <div className="animate-in fade-in slide-in-from-top-2">
                    <label className="text-xs text-blue-400 font-bold block mb-1">目标页面 (Target Screen)</label>
-                   <select value={targetId} onChange={e => setTargetId(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-white text-sm">
+                   <select value={targetId} onChange={e => setTargetId(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-content text-sm">
                      <option value="">-- 选择页面 --</option>
                      {allPages.filter(p => !p.type.includes('modal')).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                    </select>
@@ -130,7 +130,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
               {interType === 'open_modal' && (
                 <div className="animate-in fade-in slide-in-from-top-2">
                    <label className="text-xs text-yellow-500 font-bold block mb-1">目标弹窗 (Target Modal)</label>
-                   <select value={targetId} onChange={e => setTargetId(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-white text-sm">
+                   <select value={targetId} onChange={e => setTargetId(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-content text-sm">
                      <option value="">-- 选择弹窗 --</option>
                      {allPages.filter(p => p.type.includes('modal') || p.type.includes('toast')).map(p => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
                    </select>
@@ -140,7 +140,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
               {['trigger_cond', 'increment'].includes(interType) && (
                 <div className="animate-in fade-in slide-in-from-top-2">
                    <label className="text-xs text-muted font-bold block mb-1">参数 / 变量名</label>
-                   <input value={param} onChange={e => setParam(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-white text-sm" placeholder="如: HP, 100, isUnloked..." />
+                   <input value={param} onChange={e => setParam(e.target.value)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-content text-sm" placeholder="如: HP, 100, isUnloked..." />
                 </div>
               )}
             </div>
@@ -153,9 +153,9 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
               <div className="flex items-center justify-between bg-surface-3/30 p-3 rounded border border-line-strong">
                  <div className="flex items-center gap-2 text-sm text-content"><Layers size={16}/> 层级 (Z-Index)</div>
                  <div className="flex items-center gap-2">
-                   <button onClick={() => setZIndex(z => Math.max(0, z-1))} className="w-6 h-6 bg-surface rounded text-white" title="降低层级" aria-label="降低层级">-</button>
-                   <input type="number" value={zIndex} onChange={e => setZIndex(Number(e.target.value))} className="w-12 bg-bg text-center text-white text-sm rounded border border-line-strong py-0.5" />
-                   <button onClick={() => setZIndex(z => z+1)} className="w-6 h-6 bg-surface rounded text-white" title="提高层级" aria-label="提高层级">+</button>
+                   <button onClick={() => setZIndex(z => Math.max(0, z-1))} className="w-6 h-6 bg-surface rounded text-content" title="降低层级" aria-label="降低层级">-</button>
+                   <input type="number" value={zIndex} onChange={e => setZIndex(Number(e.target.value))} className="w-12 bg-bg text-center text-content text-sm rounded border border-line-strong py-0.5" />
+                   <button onClick={() => setZIndex(z => z+1)} className="w-6 h-6 bg-surface rounded text-content" title="提高层级" aria-label="提高层级">+</button>
                  </div>
               </div>
 
@@ -164,21 +164,21 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
                 <label className="text-xs text-subtle font-bold uppercase">初始状态 (Initial State)</label>
                 
                 <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsDisabled(!isDisabled)} role="switch" aria-checked={isDisabled} tabIndex={0} aria-label="切换禁用状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsDisabled(!isDisabled); } }}>
-                   <span className="text-sm text-white flex items-center gap-2"><EyeOff size={14} className={isDisabled ? 'text-red-500' : 'text-subtle'}/> 禁用 (Disabled)</span>
+                   <span className="text-sm text-content flex items-center gap-2"><EyeOff size={14} className={isDisabled ? 'text-red-500' : 'text-subtle'}/> 禁用 (Disabled)</span>
                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isDisabled ? 'bg-red-600' : 'bg-surface-3'}`}>
                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isDisabled ? 'left-4.5' : 'left-0.5'}`}></div>
                    </div>
                 </div>
 
                 <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsActive(!isActive)} role="switch" aria-checked={isActive} tabIndex={0} aria-label="切换激活状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsActive(!isActive); } }}>
-                   <span className="text-sm text-white flex items-center gap-2"><Zap size={14} className={isActive ? 'text-yellow-500' : 'text-subtle'}/> 激活/高亮 (Active)</span>
+                   <span className="text-sm text-content flex items-center gap-2"><Zap size={14} className={isActive ? 'text-yellow-500' : 'text-subtle'}/> 激活/高亮 (Active)</span>
                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isActive ? 'bg-yellow-600' : 'bg-surface-3'}`}>
                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isActive ? 'left-4.5' : 'left-0.5'}`}></div>
                    </div>
                 </div>
 
                 <div className="flex items-center justify-between p-2 hover:bg-surface-3/50 rounded cursor-pointer" onClick={() => setIsVisible(!isVisible)} role="switch" aria-checked={isVisible} tabIndex={0} aria-label="切换可见状态" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsVisible(!isVisible); } }}>
-                   <span className="text-sm text-white flex items-center gap-2">👁️ 可见 (Visible)</span>
+                   <span className="text-sm text-content flex items-center gap-2">👁️ 可见 (Visible)</span>
                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isVisible ? 'bg-brand-600' : 'bg-surface-3'}`}>
                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isVisible ? 'left-4.5' : 'left-0.5'}`}></div>
                    </div>
@@ -190,7 +190,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
 
         {/* Footer */}
         <div className="p-4 border-t border-line flex justify-end gap-3 bg-bg/50">
-           <button onClick={onClose} className="px-4 py-2 text-muted hover:text-white text-sm">Cancel</button>
+           <button onClick={onClose} className="px-4 py-2 text-muted hover:text-content text-sm">Cancel</button>
            <button onClick={handleSave} className="px-6 py-2 bg-iris-600 hover:bg-iris-500 text-white rounded font-bold text-sm shadow-lg shadow-iris-700/20">Save Changes</button>
         </div>
       </div>

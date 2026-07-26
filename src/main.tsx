@@ -4,7 +4,10 @@ import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Toaster } from './utils/toast'
 import { ConfirmHost } from './utils/confirm'
+import { initTheme } from './utils/theme'
 import './index.css'
+
+initTheme()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

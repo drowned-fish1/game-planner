@@ -604,7 +604,7 @@ export function BrainstormBoard({
 
       {isDesktop && pendingConnection && (
         <div data-board-overlay="true" className="pointer-events-none absolute left-1/2 top-4 z-50 -translate-x-1/2">
-          <div className="flex items-center gap-3 rounded-full border border-brand-400/60 bg-bg/95 px-4 py-2 text-white shadow-2xl backdrop-blur">
+          <div className="flex items-center gap-3 rounded-full border border-brand-400/60 bg-bg/95 px-4 py-2 text-content shadow-2xl backdrop-blur">
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
             <span className="text-sm font-semibold">{'\u8bf7\u70b9\u51fb\u53e6\u4e00\u4e2a\u8fde\u63a5\u70b9\u5b8c\u6210\u8fde\u7ebf'}</span>
           </div>
@@ -629,7 +629,7 @@ export function BrainstormBoard({
         <div data-board-overlay="true" className="pointer-events-none absolute right-4 top-4 z-[120] max-w-xs space-y-2">
           {otherEditors.slice(0, 4).map((participant) => (
             <div key={participant.connectionId} className="rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-xl backdrop-blur">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <div className="flex items-center gap-2 text-sm font-semibold text-content">
                 <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: participant.color }} />
                 {participant.name}
               </div>
@@ -863,7 +863,7 @@ export function BrainstormBoard({
               setConnectSourceId(null);
               onPresenceChange?.('正在浏览白板', null);
             }}
-            className={`rounded-full p-2 transition-colors ${mode === 'pan' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
+            className={`rounded-full p-2 transition-colors ${mode === 'pan' ? 'bg-brand-600 text-white' : 'text-muted hover:text-content'}`}
             title="浏览模式"
             aria-label="浏览模式"
           >
@@ -876,7 +876,7 @@ export function BrainstormBoard({
               setConnectSourceId(null);
               onPresenceChange?.('正在编辑白板', null);
             }}
-            className={`rounded-full p-2 transition-colors ${mode === 'edit' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
+            className={`rounded-full p-2 transition-colors ${mode === 'edit' ? 'bg-brand-600 text-white' : 'text-muted hover:text-content'}`}
             title="编辑模式"
             aria-label="编辑模式"
           >
@@ -884,7 +884,7 @@ export function BrainstormBoard({
           </button>
           <button
             onClick={enterConnectMode}
-            className={`rounded-full p-2 transition-colors ${mode === 'connect' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
+            className={`rounded-full p-2 transition-colors ${mode === 'connect' ? 'bg-brand-600 text-white' : 'text-muted hover:text-content'}`}
             title="连线模式"
             aria-label="连线模式"
           >
@@ -909,7 +909,7 @@ export function BrainstormBoard({
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => addItem('code')} className="rounded-full bg-surface-3 px-4 py-2 text-white shadow-lg transition-colors hover:bg-line-strong" title="代码" aria-label="添加代码磁贴">
+              <button onClick={() => addItem('code')} className="rounded-full bg-surface-3 px-4 py-2 text-content shadow-lg transition-colors hover:bg-line-strong" title="代码" aria-label="添加代码磁贴">
                 <Code size={18} />
               </button>
               <button onClick={() => addItem('link')} className="rounded-full bg-sky-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-sky-500" title="网页" aria-label="添加网页磁贴">

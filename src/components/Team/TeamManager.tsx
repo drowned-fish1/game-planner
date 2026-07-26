@@ -252,7 +252,7 @@ export function TeamManager({
                 <Wifi size={22} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">联机房间</h2>
+                <h2 className="text-xl font-bold text-content">联机房间</h2>
                 <p className="text-sm text-muted">{projectName} 的实时协作入口</p>
               </div>
             </div>
@@ -260,7 +260,7 @@ export function TeamManager({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => void onRefreshServiceInfo()}
-                className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-content transition-colors hover:border-brand-500 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-content transition-colors hover:border-brand-500 hover:text-content"
               >
                 <RefreshCw size={16} />
                 刷新端口
@@ -280,7 +280,7 @@ export function TeamManager({
           <div className="mt-5 grid gap-4 xl:grid-cols-3">
             <div className="rounded-xl border border-line bg-bg/70 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-semibold text-white">本地服务</div>
+                <div className="text-sm font-semibold text-content">本地服务</div>
                 <div className={`rounded-full px-2 py-1 text-xs ${collaboration.serviceInfo?.ready ? 'bg-brand-500/15 text-brand-300' : 'bg-rose-500/15 text-rose-300'}`}>
                   {connectionLabel}
                 </div>
@@ -289,7 +289,7 @@ export function TeamManager({
               <div className="space-y-3 text-sm text-content">
                 <div className="rounded-lg border border-line bg-bg/70 p-3">
                   <div className="text-xs uppercase tracking-wide text-subtle">本地端口</div>
-                  <div className="mt-1 flex items-center gap-2 text-base font-semibold text-white">
+                  <div className="mt-1 flex items-center gap-2 text-base font-semibold text-content">
                     <Server size={16} className="text-brand-400" />
                     {collaboration.serviceInfo?.port || '未启动'}
                   </div>
@@ -308,7 +308,7 @@ export function TeamManager({
                         className="flex w-full items-center justify-between rounded-lg border border-line bg-bg/60 px-3 py-2 text-left transition-colors hover:border-brand-500"
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-sm text-white">{entry.wsUrl}</div>
+                          <div className="truncate text-sm text-content">{entry.wsUrl}</div>
                           <div className="text-xs text-subtle">{entry.httpUrl}</div>
                         </div>
                         <Copy size={14} className="shrink-0 text-muted" />
@@ -324,7 +324,7 @@ export function TeamManager({
             </div>
 
             <div className="rounded-xl border border-line bg-bg/70 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-content">
                 <PlugZap size={16} className="text-amber-400" />
                 房间信息
               </div>
@@ -335,7 +335,7 @@ export function TeamManager({
                   <input
                     value={profile.name}
                     onChange={(event) => onUpdateProfile({ ...profile, name: event.target.value })}
-                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
+                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-content outline-none transition-colors focus:border-brand-500"
                     placeholder="输入房间昵称"
                   />
                 </label>
@@ -345,7 +345,7 @@ export function TeamManager({
                   <input
                     value={roomIdInput}
                     onChange={(event) => setRoomIdInput(event.target.value)}
-                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
+                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-content outline-none transition-colors focus:border-brand-500"
                     placeholder={defaultRoomId}
                   />
                 </label>
@@ -367,7 +367,7 @@ export function TeamManager({
             </div>
 
             <div className="rounded-xl border border-line bg-bg/70 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-content">
                 <DoorOpen size={16} className="text-sky-400" />
                 加入远程房间
               </div>
@@ -378,7 +378,7 @@ export function TeamManager({
                   <input
                     value={serverUrlInput}
                     onChange={(event) => setServerUrlInput(event.target.value)}
-                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
+                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-content outline-none transition-colors focus:border-brand-500"
                     placeholder="frp-off.com:19077 或 ws://frp-off.com:19077/ws"
                   />
                 </label>
@@ -412,14 +412,14 @@ export function TeamManager({
 
           <div className="mt-4 rounded-xl border border-line bg-bg/60 p-4">
             <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <div className="flex items-center gap-2 text-sm font-semibold text-content">
                 <Network size={16} className="text-brand-400" />
                 局域网房间
               </div>
               <button
                 onClick={() => void scanLanRooms()}
                 disabled={lanLoading}
-                className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-content transition-colors hover:border-brand-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-content transition-colors hover:border-brand-500 hover:text-content disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {lanLoading ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
                 扫描局域网
@@ -432,7 +432,7 @@ export function TeamManager({
                 return (
                   <div key={`${peer.address}-${room.id}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg/60 p-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white">{room.projectName || room.id}</div>
+                      <div className="text-sm font-semibold text-content">{room.projectName || room.id}</div>
                       <div className="mt-1 break-all text-xs text-muted">
                         设备 {peer.deviceName} · 地址 {peer.address}:{peer.service?.port || '-'} · 房间号 {room.id}
                       </div>
@@ -464,7 +464,7 @@ export function TeamManager({
           <section className="rounded-2xl border border-line bg-surface/80 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="flex items-center gap-2 text-lg font-bold text-white">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-content">
                   <Users size={18} className="text-brand-400" />
                   在线协作者
                 </h3>
@@ -487,7 +487,7 @@ export function TeamManager({
                         {participant.name[0]}
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate font-semibold text-white">
+                        <div className="truncate font-semibold text-content">
                           {participant.name}
                           {participant.connectionId === collaboration.selfConnectionId ? ' (你)' : ''}
                         </div>
@@ -516,7 +516,7 @@ export function TeamManager({
           </section>
 
           <section className="rounded-2xl border border-line bg-surface/80 p-5 shadow-xl">
-            <div className="mb-4 flex items-center gap-2 text-lg font-bold text-white">
+            <div className="mb-4 flex items-center gap-2 text-lg font-bold text-content">
               <Activity size={18} className="text-amber-400" />
               最近活动
             </div>
@@ -524,7 +524,7 @@ export function TeamManager({
             <div className="space-y-3">
               {collaboration.activityLog.map((activityItem) => (
                 <div key={activityItem.id} className="rounded-xl border border-line bg-bg/70 p-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                  <div className="flex items-center gap-2 text-sm font-medium text-content">
                     <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: activityItem.color }} />
                     {activityItem.actorName}
                   </div>
@@ -549,7 +549,7 @@ export function TeamManager({
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center justify-between border-b border-line px-4 pb-4 pt-4 md:px-8">
         <div>
-          <h2 className="text-xl font-bold text-white md:text-3xl">团队成员</h2>
+          <h2 className="text-xl font-bold text-content md:text-3xl">团队成员</h2>
           <p className="mt-1 text-xs text-muted md:text-sm">右键成员卡片可以改名、改职责或换头像</p>
         </div>
         <button
@@ -590,7 +590,7 @@ export function TeamManager({
                 {member.avatar ? <img src={member.avatar} className="h-full w-full object-cover" /> : member.name[0]}
               </div>
               <div className="w-full text-center">
-                <h3 className="truncate px-2 text-base font-bold text-white md:text-lg">{member.name}</h3>
+                <h3 className="truncate px-2 text-base font-bold text-content md:text-lg">{member.name}</h3>
                 <div className="mt-1 inline-block max-w-full truncate rounded border border-line bg-bg px-2 py-0.5 text-[10px] text-brand-400 md:text-xs">
                   {member.role}
                 </div>
@@ -641,7 +641,7 @@ export function TeamManager({
       {modal.isOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))}>
           <div className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <h3 className="mb-4 text-xl font-bold text-white">
+            <h3 className="mb-4 text-xl font-bold text-content">
               {modal.type === 'add' ? '添加新成员' : modal.type === 'rename' ? '修改名字' : '修改职责'}
             </h3>
             <form onSubmit={handleModalSubmit}>
@@ -650,10 +650,10 @@ export function TeamManager({
                 value={modal.inputValue}
                 onChange={(event) => setModal((prev) => ({ ...prev, inputValue: event.target.value }))}
                 placeholder={modal.type === 'role' ? '例如：主程 / 数值 / 关卡策划' : '请输入内容'}
-                className="mb-6 w-full rounded border border-line-strong bg-bg px-4 py-3 text-white outline-none focus:border-brand-500"
+                className="mb-6 w-full rounded border border-line-strong bg-bg px-4 py-3 text-content outline-none focus:border-brand-500"
               />
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))} className="px-4 py-2 text-muted transition-colors hover:text-white">
+                <button type="button" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))} className="px-4 py-2 text-muted transition-colors hover:text-content">
                   取消
                 </button>
                 <button type="submit" className="rounded bg-brand-600 px-6 py-2 font-bold text-white shadow-lg transition-colors hover:bg-brand-500">

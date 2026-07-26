@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0C111A" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <title>Game Planner Pro · 游戏策划工作台</title>
     <!-- Optional web fonts (degrade gracefully to system fonts offline) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,9 +15,14 @@
       rel="stylesheet"
     />
     <style>
-      /* Prevent white flash before the app mounts */
+      /* Prevent flash before the app mounts (light variant applied by the early theme script) */
       html, body { background-color: #0C111A; }
+      html.light, html.light body { background-color: #F4F6FA; }
     </style>
+    <script>
+      // 尽早应用主题偏好，避免浅色用户看到深色闪屏
+      try { if (localStorage.getItem('gp_theme') === 'light') document.documentElement.classList.add('light'); } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

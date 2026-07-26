@@ -20,6 +20,7 @@ import { UIManager } from './components/UIPrototype/UIManager';
 import { Settings } from './components/Settings/Settings';
 import { loadProjectContent, ProjectContent, ProjectMeta, saveProjectContent } from './utils/storage';
 import { toast } from './utils/toast';
+import { getTheme, setTheme } from './utils/theme';
 import {
   createDefaultRoomId,
   createEmptyRoomSession,
@@ -469,6 +470,13 @@ function App() {
       })),
       { id: 'goto-settings', label: '跳转：设置', hint: 'AI 服务配置', keywords: 'settings', perform: () => setActiveModule('settings') },
       { id: 'save', label: '保存项目', hint: 'Ctrl+S', keywords: 'save', perform: saveNow },
+      {
+        id: 'toggle-theme',
+        label: '切换深色 / 浅色主题',
+        hint: '外观',
+        keywords: 'theme dark light 主题',
+        perform: () => setTheme(getTheme() === 'light' ? 'dark' : 'light'),
+      },
       { id: 'back-home', label: '返回项目大厅', hint: '自动保存后退出', keywords: 'back home dashboard', perform: closeProject },
       { id: 'shortcut-help', label: '查看快捷键', hint: '?', keywords: 'shortcut help keyboard', perform: () => setHelpOpen(true) },
     ];

@@ -54,11 +54,11 @@ export function AssetEditorModal({ onSave, onClose }: AssetEditorModalProps) {
         
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-line bg-bg">
-          <h3 className="text-white font-bold flex items-center gap-2">
+          <h3 className="text-content font-bold flex items-center gap-2">
             <ImageIcon className="text-iris-500" size={20}/> 
             资产切片编辑器 (Asset Slicer)
           </h3>
-          <button onClick={onClose} className="text-muted hover:text-white" title="关闭" aria-label="关闭资产编辑器"><X size={20} /></button>
+          <button onClick={onClose} className="text-muted hover:text-content" title="关闭" aria-label="关闭资产编辑器"><X size={20} /></button>
         </div>
 
         <div className="flex-1 flex overflow-hidden">
@@ -93,12 +93,12 @@ export function AssetEditorModal({ onSave, onClose }: AssetEditorModalProps) {
             {/* 1. 图片来源 */}
             <div className="space-y-3">
               <label className="text-xs font-bold text-muted uppercase flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-surface-3 text-white flex items-center justify-center text-[10px]">1</span> 
+                  <span className="w-4 h-4 rounded-full bg-surface-3 text-content flex items-center justify-center text-[10px]">1</span> 
                   图片来源
               </label>
               <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-line hover:border-brand-500 hover:bg-surface rounded-lg cursor-pointer transition-all group">
                   <Upload size={24} className="text-subtle group-hover:text-brand-400 mb-2" />
-                  <span className="text-xs text-muted group-hover:text-white">点击上传图片</span>
+                  <span className="text-xs text-muted group-hover:text-content">点击上传图片</span>
                   <input type="file" onChange={handleFileChange} className="hidden" accept="image/*" />
               </label>
             </div>
@@ -113,19 +113,19 @@ export function AssetEditorModal({ onSave, onClose }: AssetEditorModalProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                     <span className="text-[10px] text-subtle font-mono">X (起点)</span>
-                    <input type="number" value={sx} onChange={e => setSx(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-white text-sm font-mono focus:border-brand-500 outline-none" />
+                    <input type="number" value={sx} onChange={e => setSx(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-content text-sm font-mono focus:border-brand-500 outline-none" />
                 </div>
                 <div className="space-y-1">
                     <span className="text-[10px] text-subtle font-mono">Y (起点)</span>
-                    <input type="number" value={sy} onChange={e => setSy(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-white text-sm font-mono focus:border-brand-500 outline-none" />
+                    <input type="number" value={sy} onChange={e => setSy(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-content text-sm font-mono focus:border-brand-500 outline-none" />
                 </div>
                 <div className="space-y-1">
                     <span className="text-[10px] text-subtle font-mono">Width (宽)</span>
-                    <input type="number" value={sw} onChange={e => setSw(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-white text-sm font-mono focus:border-brand-500 outline-none" />
+                    <input type="number" value={sw} onChange={e => setSw(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-content text-sm font-mono focus:border-brand-500 outline-none" />
                 </div>
                 <div className="space-y-1">
                     <span className="text-[10px] text-subtle font-mono">Height (高)</span>
-                    <input type="number" value={sh} onChange={e => setSh(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-white text-sm font-mono focus:border-brand-500 outline-none" />
+                    <input type="number" value={sh} onChange={e => setSh(Number(e.target.value))} className="w-full bg-surface border border-line-strong rounded px-2 py-1.5 text-content text-sm font-mono focus:border-brand-500 outline-none" />
                 </div>
               </div>
 
@@ -137,7 +137,7 @@ export function AssetEditorModal({ onSave, onClose }: AssetEditorModalProps) {
             {/* 3. 保存 */}
             <div className="space-y-3 pt-4 border-t border-line mt-auto">
                <label className="text-xs font-bold text-muted uppercase">资产命名</label>
-               <input value={label} onChange={e => setLabel(e.target.value)} className="w-full bg-surface border border-line-strong rounded px-3 py-2 text-white text-sm focus:border-iris-500 outline-none" placeholder="例如：红色按钮" />
+               <input value={label} onChange={e => setLabel(e.target.value)} className="w-full bg-surface border border-line-strong rounded px-3 py-2 text-content text-sm focus:border-iris-500 outline-none" placeholder="例如：红色按钮" />
                
                <button onClick={handleSave} disabled={!imageUrl} className="w-full bg-iris-600 hover:bg-iris-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-iris-700/20 transition-all active:scale-95">
                   <Save size={16} /> 保存到资产库

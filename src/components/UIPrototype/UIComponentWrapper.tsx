@@ -127,7 +127,7 @@ export function UIComponentWrapper({
         )}
 
         {!isMoving && component.interaction?.type !== 'none' && (
-           <div className="absolute -top-2 -right-2 bg-surface-3 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm z-[200] pointer-events-none border border-line-strong">
+           <div className="absolute -top-2 -right-2 bg-surface-3 text-content text-[9px] px-1.5 py-0.5 rounded shadow-sm z-[200] pointer-events-none border border-line-strong">
              {component.interaction?.type}
            </div>
         )}

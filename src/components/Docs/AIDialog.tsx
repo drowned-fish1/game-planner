@@ -68,7 +68,7 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
             <Sparkles size={18} />
             <span className="font-bold text-sm uppercase tracking-wider">AI Assistant - {mode.toUpperCase()}</span>
           </div>
-          <button onClick={onClose} title="关闭" aria-label="关闭"><X size={18} className="text-subtle hover:text-white" /></button>
+          <button onClick={onClose} title="关闭" aria-label="关闭"><X size={18} className="text-subtle hover:text-content" /></button>
         </div>
 
         {/* Body */}
@@ -84,7 +84,7 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
                    onChange={e => setPrompt(e.target.value)}
                    onKeyDown={e => e.key === 'Enter' && handleRunAI(prompt)}
                    placeholder="例如：设计一把传说级的火焰长剑..."
-                   className="flex-1 bg-bg border border-line-strong rounded-lg px-3 py-2 md:px-4 md:py-3 text-sm text-white focus:border-iris-500 outline-none"
+                   className="flex-1 bg-bg border border-line-strong rounded-lg px-3 py-2 md:px-4 md:py-3 text-sm text-content focus:border-iris-500 outline-none"
                    autoFocus
                  />
                  <button
@@ -110,8 +110,8 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
                  <label className="text-xs font-bold text-brand-500 uppercase">生成结果</label>
                  {result && (
                    <div className="flex gap-2">
-                      <button onClick={() => handleRunAI(mode === 'generate' ? prompt : selectedText)} className="text-subtle hover:text-white text-xs flex items-center gap-1"><RefreshCw size={12}/> 重试</button>
-                      <button onClick={() => navigator.clipboard.writeText(result)} className="text-subtle hover:text-white text-xs flex items-center gap-1"><Copy size={12}/> 复制</button>
+                      <button onClick={() => handleRunAI(mode === 'generate' ? prompt : selectedText)} className="text-subtle hover:text-content text-xs flex items-center gap-1"><RefreshCw size={12}/> 重试</button>
+                      <button onClick={() => navigator.clipboard.writeText(result)} className="text-subtle hover:text-content text-xs flex items-center gap-1"><Copy size={12}/> 复制</button>
                    </div>
                  )}
                </div>
@@ -133,7 +133,7 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-line bg-bg/50 flex justify-end gap-3">
-           <button onClick={onClose} className="px-3 py-2 text-muted hover:text-white text-xs md:text-sm">取消</button>
+           <button onClick={onClose} className="px-3 py-2 text-muted hover:text-content text-xs md:text-sm">取消</button>
            {result && (
              <>
                {mode !== 'generate' && (

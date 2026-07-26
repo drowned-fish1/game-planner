@@ -100,7 +100,7 @@ export function TodoList({ todos, members, actorName = '有人', onUpdate, onAct
         <input
           value={newText}
           onChange={(event) => setNewText(event.target.value)}
-          className="rounded border border-line-strong bg-bg px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
+          className="rounded border border-line-strong bg-bg px-3 py-2 text-sm text-content outline-none transition-colors focus:border-brand-500"
           placeholder="添加新任务..."
         />
         <div className="flex gap-2">

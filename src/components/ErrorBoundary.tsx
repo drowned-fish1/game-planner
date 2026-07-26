@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <AlertOctagon size={30} />
         </div>
         <div className="max-w-md space-y-2">
-          <h1 className="text-xl font-semibold text-white">应用遇到了一个问题</h1>
+          <h1 className="text-xl font-semibold text-content">应用遇到了一个问题</h1>
           <p className="text-sm leading-relaxed text-muted">
             界面渲染时出现了未预期的错误。你的数据已保存在本地，不会丢失。可以尝试恢复，或重新载入应用。
           </p>

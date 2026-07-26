@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2, Moon, Sun, Palette } from 'lucide-react';
 import { toast } from '../../utils/toast';
 import { confirmDialog } from '../../utils/confirm';
 import { testAIConnection } from '../../utils/aiService';
+import { getTheme, setTheme, ThemeMode } from '../../utils/theme';
 
 export interface AIConfig {
   id: string;
@@ -34,6 +35,12 @@ export function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [theme, setThemeState] = useState<ThemeMode>(() => getTheme());
+
+  const switchTheme = (mode: ThemeMode) => {
+    setThemeState(mode);
+    setTheme(mode);
+  };
 
   useEffect(() => {
     loadConfigs();
@@ -134,6 +141,33 @@ export function Settings() {
       {/* 内容区域 */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="mx-auto max-w-4xl space-y-8">
+            {/* 外观板块 */}
+            <section>
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><Palette size={20} className="text-brand-400"/> 外观</h2>
+                <div className="card flex flex-wrap items-center justify-between gap-4 p-4">
+                    <div>
+                        <div className="text-sm font-semibold text-content">主题</div>
+                        <div className="mt-0.5 text-xs text-muted">深色为默认；切换立即生效并记住偏好</div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => switchTheme('dark')}
+                            className={theme === 'dark' ? 'btn-primary' : 'btn-outline'}
+                            aria-pressed={theme === 'dark'}
+                        >
+                            <Moon size={15} /> 深色
+                        </button>
+                        <button
+                            onClick={() => switchTheme('light')}
+                            className={theme === 'light' ? 'btn-primary' : 'btn-outline'}
+                            aria-pressed={theme === 'light'}
+                        >
+                            <Sun size={15} /> 浅色
+                        </button>
+                    </div>
+                </div>
+            </section>
+
             {/* AI 配置板块 */}
             <section>
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -150,8 +184,8 @@ export function Settings() {
                             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-2/40 p-4">
                                 <div className="flex min-w-[200px] flex-1 items-center gap-3">
                                     <input type="radio" checked={config.id === activeId} onChange={() => { setActiveId(config.id); setHasChanges(true); }} className="h-5 w-5 cursor-pointer accent-brand-500" />
-                                    <input value={config.name} onChange={e => updateConfig(config.id, 'name', e.target.value)} className="flex-1 border-b border-transparent bg-transparent text-lg font-bold text-white outline-none focus:border-line-strong" placeholder="配置名称" />
-                                    {config.id === activeId && <span className="chip border-brand-500/30 bg-brand-500/10 text-brand-300">当前使用</span>}
+                                    <input value={config.name} onChange={e => updateConfig(config.id, 'name', e.target.value)} className="flex-1 border-b border-transparent bg-transparent text-lg font-bold text-content outline-none focus:border-line-strong" placeholder="配置名称" />
+                                    {config.id === activeId && <span className="chip border-brand-500/30 bg-brand-500/10 text-brand-500">当前使用</span>}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button

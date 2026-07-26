@@ -147,22 +147,22 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-iris-500/30 bg-iris-500/10 text-iris-400"><Monitor size={24} /></div>
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white">UI 原型机 <span className="text-iris-400">Pro</span></h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-content">UI 原型机 <span className="text-iris-400">Pro</span></h2>
             <p className="mt-0.5 text-sm text-muted">共 {data.pages.length} 个界面</p>
           </div>
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-        <button onClick={() => setShowCreateModal(true)} className="aspect-video bg-surface/50 border-2 border-dashed border-line hover:border-brand-500 rounded-xl flex flex-col items-center justify-center group"><Plus size={32} className="text-subtle group-hover:text-white"/><span className="text-subtle mt-2">新建页面</span></button>
+        <button onClick={() => setShowCreateModal(true)} className="aspect-video bg-surface/50 border-2 border-dashed border-line hover:border-brand-500 rounded-xl flex flex-col items-center justify-center group"><Plus size={32} className="text-subtle group-hover:text-content"/><span className="text-subtle mt-2">新建页面</span></button>
         {data.pages.map(page => (
             <div key={page.id} onClick={() => setEditingPageId(page.id)} role="button" tabIndex={0} aria-label={`编辑页面 ${page.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingPageId(page.id); } }} className={`aspect-video bg-surface border-2 rounded-xl relative group cursor-pointer hover:-translate-y-1 transition-all ${data.startPageId === page.id ? 'border-iris-500' : 'border-line'}`}>
-                <div className="w-full h-full flex flex-col items-center justify-center text-white font-bold bg-bg/50">
+                <div className="w-full h-full flex flex-col items-center justify-center text-content font-bold bg-bg/50">
                     {page.name}
                     <span className="text-[10px] text-subtle font-normal uppercase mt-1">{page.type}</span>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => setStartPage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-iris-600" title="设为启动页" aria-label="设为启动页"><Play size={14}/></button>
-                    <button onClick={(e) => deletePage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-red-600" title="删除页面" aria-label="删除页面"><Trash2 size={14}/></button>
+                    <button onClick={(e) => setStartPage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-content hover:bg-iris-600 hover:text-white" title="设为启动页" aria-label="设为启动页"><Play size={14}/></button>
+                    <button onClick={(e) => deletePage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-content hover:bg-red-600 hover:text-white" title="删除页面" aria-label="删除页面"><Trash2 size={14}/></button>
                 </div>
                 {data.startPageId === page.id && <div className="absolute top-2 left-2 bg-iris-600 text-[10px] px-2 rounded font-bold">HOME</div>}
             </div>
@@ -183,11 +183,11 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm p-4" onClick={() => setShowCreateModal(false)}>
             <div className="bg-surface p-6 rounded-2xl w-full max-w-[800px] border border-line shadow-elevated animate-scale-in" onClick={e => e.stopPropagation()}>
-                <h3 className="text-white font-bold mb-4 text-xl">选择界面模板</h3>
+                <h3 className="text-content font-bold mb-4 text-xl">选择界面模板</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {PAGE_PRESETS.map((p, i) => (
                         <div key={i} onClick={() => createPage(p)} role="button" tabIndex={0} aria-label={`使用模板 ${p.label} 创建页面`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); createPage(p); } }} className="bg-surface-3/50 p-4 rounded-lg cursor-pointer hover:bg-brand-600/20 hover:border-brand-500 border border-line-strong text-center flex flex-col items-center justify-center h-32 group transition-all">
-                            <p className="text-content group-hover:text-white font-bold mb-1">{p.label}</p>
+                            <p className="text-content group-hover:text-content font-bold mb-1">{p.label}</p>
                             <span className="text-[10px] text-subtle">{p.w}x{p.h}</span>
                         </div>
                     ))}
