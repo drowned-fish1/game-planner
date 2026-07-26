@@ -94,13 +94,37 @@ export interface UIPage {
   components: UIComponent[];
 }
 
+// === 白板（Brainstorm）相关类型 ===
+export type BrainstormItemType =
+  | 'text' | 'image' | 'status' | 'video' | 'audio' | 'link' | 'code' | 'ai' | 'note' | 'drawing';
+
+export type BrainstormHandle = 'top' | 'right' | 'bottom' | 'left';
+
+export interface BrainstormItem {
+  id: string;
+  type: BrainstormItemType;
+  content: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+}
+
+export interface BrainstormConnection {
+  id: string;
+  start: string;
+  end: string;
+  startHandle?: BrainstormHandle;
+  endHandle?: BrainstormHandle;
+}
+
 // === 项目详细内容 ===
 export interface ProjectContent {
-  brainstorm: { items: any[]; connections: any[] };
+  brainstorm: { items: BrainstormItem[]; connections: BrainstormConnection[] };
   members: TeamMember[];
   todos: TodoItem[];
   docs: DocItem[];
-  assets: CustomAsset[]; 
+  assets: CustomAsset[];
   ui: {
     pages: UIPage[];
     startPageId?: string;
@@ -115,7 +139,7 @@ export interface ProjectContent {
 interface GlobalStore {
   projects: ProjectMeta[];
   contents: Record<string, ProjectContent>; // key是projectId
-  configs: any; // 预留给 AI 配置等
+  configs: Record<string, unknown>; // 预留给 AI 配置等
 }
 
 // 帮助函数：获取 Electron API
@@ -210,18 +234,20 @@ export const loadProjectContent = (projectId: string): ProjectContent => {
     if (!parsed.assets) parsed.assets = []; 
 
     if (parsed.ui && Array.isArray(parsed.ui.pages)) {
-      parsed.ui.pages.forEach((page: any) => {
+      parsed.ui.pages.forEach((page) => {
         if (!page.type) page.type = 'screen';
         if (!page.components) page.components = [];
 
-        page.components.forEach((comp: any) => {
-          if (!comp.interaction) comp.interaction = { type: 'none' };
-          if (!comp.state) comp.state = { isVisible: true, isActive: false, isDisabled: false };
-          if (typeof comp.zIndex !== 'number') comp.zIndex = 1;
-          
-          if (comp.type === 'fixed') {
-             comp.type = 'sprite';
-             comp.interaction = { type: 'none' };
+        page.components.forEach((comp) => {
+          // 旧版本存档里组件可能缺字段、type 还可能是已废弃的 'fixed'
+          const legacy = comp as Omit<UIComponent, 'type'> & { type: UIComponent['type'] | 'fixed' };
+          if (!legacy.interaction) legacy.interaction = { type: 'none' };
+          if (!legacy.state) legacy.state = { isVisible: true, isActive: false, isDisabled: false };
+          if (typeof legacy.zIndex !== 'number') legacy.zIndex = 1;
+
+          if (legacy.type === 'fixed') {
+            legacy.type = 'sprite';
+            legacy.interaction = { type: 'none' };
           }
         });
       });
@@ -273,15 +299,24 @@ export const exportProject = (projectId: string): ProjectExportFile | null => {
 
 // 解析导出文件并作为新项目导入（新 id、深拷贝内容）。格式不对时抛出中文错误信息。
 export const importProject = (raw: string): ProjectMeta => {
-  let data: any;
+  let parsed: unknown;
   try {
-    data = JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch {
     throw new Error('文件不是有效的 JSON');
   }
 
+  // 未验证前按候选形状处理，逐字段校验后再收敛为具体类型
+  const data = parsed as {
+    format?: unknown;
+    version?: unknown;
+    meta?: { name?: unknown; cover?: unknown };
+    content?: unknown;
+  } | null;
+
   if (
     !data
+    || typeof data !== 'object'
     || data.format !== 'game-planner-project'
     || data.version !== 1
     || !data.meta
@@ -299,7 +334,7 @@ export const importProject = (raw: string): ProjectMeta => {
     lastModified: Date.now(),
   };
 
-  const content: ProjectContent = JSON.parse(JSON.stringify(data.content));
+  const content = JSON.parse(JSON.stringify(data.content)) as ProjectContent;
 
   const store = loadGlobalStore();
   store.projects = [newMeta, ...store.projects];

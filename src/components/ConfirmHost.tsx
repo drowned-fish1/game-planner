@@ -1,70 +1,17 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-
-/**
- * Promise-based in-app confirm dialog (replaces native confirm()).
- *
- * Usage:
- *   import { confirmDialog, ConfirmHost } from './utils/confirm';
- *   // mount <ConfirmHost /> once at the app root
- *   if (await confirmDialog({ title: '删除项目？', danger: true })) { ... }
- */
-
-export interface ConfirmOptions {
-  title: string;
-  message?: string;
-  confirmText?: string;
-  cancelText?: string;
-  danger?: boolean;
-}
-
-interface PendingConfirm extends ConfirmOptions {
-  id: number;
-  resolve: (value: boolean) => void;
-}
-
-type Listener = (pending: PendingConfirm | null) => void;
-
-let pending: PendingConfirm | null = null;
-let listeners: Listener[] = [];
-let seq = 1;
-
-function emit() {
-  for (const l of listeners) l(pending);
-}
-
-export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
-  return new Promise((resolve) => {
-    // If one is already open, auto-cancel it first.
-    if (pending) pending.resolve(false);
-    pending = { id: seq++, resolve, ...options };
-    emit();
-  });
-}
-
-function settle(value: boolean) {
-  if (!pending) return;
-  pending.resolve(value);
-  pending = null;
-  emit();
-}
+import { getPendingConfirm, settleConfirm, subscribeConfirm, type PendingConfirm } from '../utils/confirm';
 
 export function ConfirmHost() {
-  const [current, setCurrent] = useState<PendingConfirm | null>(pending);
+  const [current, setCurrent] = useState<PendingConfirm | null>(getPendingConfirm());
 
-  useEffect(() => {
-    const listener: Listener = (next) => setCurrent(next);
-    listeners.push(listener);
-    return () => {
-      listeners = listeners.filter((l) => l !== listener);
-    };
-  }, []);
+  useEffect(() => subscribeConfirm((next) => setCurrent(next)), []);
 
   useEffect(() => {
     if (!current) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') settle(false);
-      if (e.key === 'Enter') settle(true);
+      if (e.key === 'Escape') settleConfirm(false);
+      if (e.key === 'Enter') settleConfirm(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -75,7 +22,7 @@ export function ConfirmHost() {
   return (
     <div
       className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
-      onClick={() => settle(false)}
+      onClick={() => settleConfirm(false)}
     >
       <div
         role="alertdialog"
@@ -99,11 +46,11 @@ export function ConfirmHost() {
         </div>
 
         <div className="mt-5 flex justify-end gap-2.5">
-          <button onClick={() => settle(false)} className="btn-ghost">
+          <button onClick={() => settleConfirm(false)} className="btn-ghost">
             {current.cancelText || '取消'}
           </button>
           <button
-            onClick={() => settle(true)}
+            onClick={() => settleConfirm(true)}
             autoFocus
             className={current.danger ? 'btn-danger' : 'btn-primary'}
           >

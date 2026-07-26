@@ -1,7 +1,8 @@
 // src/components/Docs/Docs.tsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent, BubbleMenu, type Editor } from '@tiptap/react';
+import type { Node as PMNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
@@ -51,7 +52,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
   const [docs, setDocs] = useState<DocItem[]>(initialDocs || []);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<Editor | null>(null);
 
   // UI States
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,6 +63,24 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
   const [aiMode, setAiMode] = useState<AIMode | null>(null);
   const [aiSelectedText, setAiSelectedText] = useState('');
 
+  const createDocFromTemplate = useCallback((templateId: string, parentId: string | null) => {
+    const template = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0];
+    const newDoc: DocItem = {
+      id: uuidv4(),
+      title: template.id === 'blank' ? '未命名文档' : template.name,
+      content: template.content,
+      parentId: parentId,
+      expanded: true
+    };
+    let newDocs = [...docs, newDoc];
+    if (parentId) newDocs = newDocs.map(d => d.id === parentId ? { ...d, expanded: true } : d);
+    setDocs(newDocs);
+    onUpdate(newDocs);
+    setActiveDocId(newDoc.id);
+    setIsTemplateModalOpen(false);
+    setIsMobileMenuOpen(false);
+  }, [docs, onUpdate]);
+
   // Initialization
   useEffect(() => {
     if (initialDocs && initialDocs.length > 0) {
@@ -71,9 +90,10 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
         }
     } else if (initialDocs && initialDocs.length === 0 && docs.length === 0) {
         // Create default doc if empty
+        // （docs.length 守卫保证只在真正空库时建一次，不会随 deps 变化重复创建）
         createDocFromTemplate('gdd', null);
     }
-  }, [initialDocs]);
+  }, [initialDocs, activeDocId, docs.length, createDocFromTemplate]);
 
   // Esc 关闭模板选择弹窗
   useEffect(() => {
@@ -94,24 +114,6 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
     const newDocs = docs.map(d => d.id === id ? { ...d, title } : d);
     setDocs(newDocs);
     onUpdate(newDocs);
-  };
-
-  const createDocFromTemplate = (templateId: string, parentId: string | null) => {
-    const template = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0];
-    const newDoc: DocItem = {
-      id: uuidv4(),
-      title: template.id === 'blank' ? '未命名文档' : template.name,
-      content: template.content,
-      parentId: parentId,
-      expanded: true
-    };
-    let newDocs = [...docs, newDoc];
-    if (parentId) newDocs = newDocs.map(d => d.id === parentId ? { ...d, expanded: true } : d);
-    setDocs(newDocs);
-    onUpdate(newDocs);
-    setActiveDocId(newDoc.id);
-    setIsTemplateModalOpen(false);
-    setIsMobileMenuOpen(false);
   };
 
   const handleCreateClick = (parentId: string | null) => {
@@ -140,7 +142,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
     if (activeDocId && idsToDelete.has(activeDocId)) setActiveDocId(null);
   };
 
-  const toggleExpand = (e: React.MouseEvent, id: string) => {
+  const toggleExpand = (e: { stopPropagation: () => void }, id: string) => {
     e.stopPropagation();
     setDocs(docs.map(d => d.id === id ? { ...d, expanded: !d.expanded } : d));
   };
@@ -256,7 +258,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectDoc(doc.id); } }}
           >
-            <span className={`p-1 rounded hover:bg-surface-3/50 ${hasChildren ? 'opacity-100' : 'opacity-0'}`} role="button" tabIndex={0} aria-expanded={doc.expanded} title="展开/折叠" aria-label="展开/折叠子文档" onClick={(e) => { e.stopPropagation(); hasChildren && toggleExpand(e, doc.id); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); hasChildren && toggleExpand(e as any, doc.id); } }}>
+            <span className={`p-1 rounded hover:bg-surface-3/50 ${hasChildren ? 'opacity-100' : 'opacity-0'}`} role="button" tabIndex={0} aria-expanded={doc.expanded} title="展开/折叠" aria-label="展开/折叠子文档" onClick={(e) => { e.stopPropagation(); hasChildren && toggleExpand(e, doc.id); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (hasChildren) toggleExpand(e, doc.id); } }}>
               {doc.expanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
             </span>
             {hasChildren ? <Folder size={16} className="text-yellow-500/80"/> : <FileText size={16} className="text-blue-400/80"/>}
@@ -331,7 +333,7 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
                 initialContent={activeDoc.content} 
                 onChange={(html: string) => updateDocContent(activeDoc.id, html)} 
                 onHeadingsUpdate={setHeadings} 
-                setEditorRef={(editor: any) => editorRef.current = editor} 
+                setEditorRef={(editor: Editor) => { editorRef.current = editor; }}
                 onAIRequest={(mode: AIMode, text: string) => { setAiSelectedText(text); setAiMode(mode); }} 
               />
             </div>
@@ -365,22 +367,31 @@ export function Docs({ initialDocs, onUpdate }: DocsProps) {
 }
 
 // === Editor Component ===
-function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIRequest, onHeadingsUpdate }: any) {
+interface TiptapEditorProps {
+  docId: string;
+  initialContent: string;
+  onChange: (html: string) => void;
+  setEditorRef: (editor: Editor) => void;
+  onAIRequest: (mode: AIMode, text: string) => void;
+  onHeadingsUpdate?: (headings: HeadingItem[]) => void;
+}
+
+function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIRequest, onHeadingsUpdate }: TiptapEditorProps) {
   const onChangeRef = useRef(onChange);
-  const prevHeadingsRef = useRef<string>(""); 
+  const prevHeadingsRef = useRef<string>("");
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   // Extract headings for the outline view
-  const extractHeadings = (editor: any) => {
+  const extractHeadings = useCallback((editor: Editor) => {
     if (!onHeadingsUpdate) return;
     const headings: HeadingItem[] = [];
-    editor.state.doc.descendants((node: any, pos: number) => {
+    editor.state.doc.descendants((node: PMNode, pos: number) => {
       if (node.type.name === 'heading') headings.push({ level: node.attrs.level, text: node.textContent, id: `heading-${pos}`, pos: pos });
     });
     const headingsStr = JSON.stringify(headings.map(h => h.id + h.text));
     if (headingsStr !== prevHeadingsRef.current) { prevHeadingsRef.current = headingsStr; onHeadingsUpdate(headings); }
-  };
+  }, [onHeadingsUpdate]);
 
   const editor = useEditor({
     extensions: [
@@ -391,15 +402,15 @@ function TiptapEditor({ docId, initialContent, onChange, setEditorRef, onAIReque
       Placeholder.configure({ placeholder: '输入内容 (# 标题)...' }), 
       BubbleMenuExtension.configure({ pluginKey: 'bubbleMenu' })
     ],
-    onUpdate: ({ editor }: { editor: any }) => { onChangeRef.current(editor.getHTML()); extractHeadings(editor); },
-    onCreate: ({ editor }: { editor: any }) => { setEditorRef(editor); if (initialContent) editor.commands.setContent(initialContent); setTimeout(() => extractHeadings(editor), 100); },
+    onUpdate: ({ editor }) => { onChangeRef.current(editor.getHTML()); extractHeadings(editor); },
+    onCreate: ({ editor }) => { setEditorRef(editor); if (initialContent) editor.commands.setContent(initialContent); setTimeout(() => extractHeadings(editor), 100); },
     editorProps: { attributes: { class: 'prose prose-invert prose-lg max-w-none focus:outline-none min-h-[500px] text-base md:text-lg' } },
   }, []);
 
   const previousDocIdRef = useRef(docId);
   useEffect(() => {
     if (editor && docId !== previousDocIdRef.current) { editor.commands.setContent(initialContent || ''); previousDocIdRef.current = docId; setTimeout(() => extractHeadings(editor), 50); }
-  }, [docId, editor, initialContent]);
+  }, [docId, editor, initialContent, extractHeadings]);
 
   if (!editor) return null;
 

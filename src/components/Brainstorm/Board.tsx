@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Xarrow, { Xwrapper, useXarrow } from 'react-xarrows';
 import { toPng } from 'html-to-image';
@@ -665,10 +665,10 @@ export function BrainstormBoard({
             style={{
               backgroundImage: 'radial-gradient(rgb(var(--line-strong)) 1px, transparent 1px)',
               backgroundSize: '40px 40px',
-              ['--xarrow-inv-scale' as any]: 1,
-              ['--xarrow-inv-tx' as any]: '0px',
-              ['--xarrow-inv-ty' as any]: '0px',
-            }}
+              '--xarrow-inv-scale': 1,
+              '--xarrow-inv-tx': '0px',
+              '--xarrow-inv-ty': '0px',
+            } as CSSProperties & Record<'--xarrow-inv-scale' | '--xarrow-inv-tx' | '--xarrow-inv-ty', string | number>}
             onDrop={handleDrop}
             onDragOver={(event) => event.preventDefault()}
             onMouseDown={handleCanvasMouseDown}

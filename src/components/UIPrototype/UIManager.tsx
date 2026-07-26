@@ -10,12 +10,18 @@ import { UI_ASSETS as DEFAULT_ASSETS } from './assets';
 import { PixelSprite } from './PixelSprite';
 import { confirmDialog } from '../../utils/confirm';
 
-interface UIManagerProps {
-  data: { pages: UIPage[]; startPageId?: string; assets?: CustomAsset[] }; 
-  onUpdate: (data: any) => void;
+interface UIManagerData {
+  pages: UIPage[];
+  startPageId?: string;
+  assets?: CustomAsset[];
 }
 
-const PAGE_PRESETS: { label: string; type: PageType; w: number; h: number; icon: any; desc: string }[] = [
+interface UIManagerProps {
+  data: UIManagerData;
+  onUpdate: (data: UIManagerData) => void;
+}
+
+const PAGE_PRESETS: { label: string; type: PageType; w: number; h: number; icon: typeof Monitor; desc: string }[] = [
     { label: 'PC 标准', type: 'screen', w: 1280, h: 720, icon: Monitor, desc: '桌面端游戏标准分辨率' },
     { label: 'iPhone', type: 'screen', w: 390, h: 844, icon: Smartphone, desc: '移动端竖屏布局' },
     { label: 'Tablet', type: 'screen', w: 1024, h: 768, icon: Tablet, desc: '平板/网页布局' },

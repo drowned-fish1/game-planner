@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Plus,
@@ -63,7 +63,7 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
   }, []);
 
   // 新建项目
-  const createProject = () => {
+  const createProject = useCallback(() => {
     const newProject: ProjectMeta = {
       id: uuidv4(),
       name: '未命名新项目',
@@ -74,7 +74,7 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
     setProjects(newList);
     saveProjectsList(newList);
     toast.success('已创建新项目');
-  };
+  }, [projects]);
 
   // 记住排序偏好
   useEffect(() => {
@@ -91,7 +91,7 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [projects]);
+  }, [createProject]);
 
   // 创建副本
   const duplicateProject = () => {
@@ -144,8 +144,8 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
         const meta = importProject(ev.target?.result as string);
         setProjects(getProjectsList());
         toast.success(`已导入「${meta.name}」`);
-      } catch (err: any) {
-        toast.error(`导入失败：${err?.message || '未知错误'}`);
+      } catch (err) {
+        toast.error(`导入失败：${err instanceof Error ? err.message : '未知错误'}`);
       }
     };
     reader.onerror = () => toast.error('导入失败：文件读取出错');

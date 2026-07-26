@@ -112,11 +112,10 @@ export function UICanvas({
   };
 
   const handleContextMenu = (e: React.MouseEvent | MouseEvent, id: string) => {
-    const ev = e as any;
     // 钳制到视口内，避免窄屏上 w-36 菜单溢出屏幕外
     setContextMenu({
-      x: Math.min(ev.clientX, window.innerWidth - 152),
-      y: Math.min(ev.clientY, window.innerHeight - 140),
+      x: Math.min(e.clientX, window.innerWidth - 152),
+      y: Math.min(e.clientY, window.innerHeight - 140),
       componentId: id,
     });
   };
@@ -145,7 +144,7 @@ export function UICanvas({
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        let type: any = 'image'; if (file.type.startsWith('video/')) type = 'video'; if (file.type.startsWith('audio/')) type = 'audio';
+        let type: UIComponent['type'] = 'image'; if (file.type.startsWith('video/')) type = 'video'; if (file.type.startsWith('audio/')) type = 'audio';
         addItem(type, ev.target?.result as string);
       };
       reader.readAsDataURL(file);

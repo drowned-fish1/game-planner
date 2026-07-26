@@ -4,6 +4,12 @@ import { AIConfig } from '../components/Settings/Settings';
 const STORAGE_KEY_CONFIGS = 'gp_ai_configs';
 const STORAGE_KEY_ACTIVE = 'gp_ai_active_id';
 
+/** OpenAI 兼容接口的响应形状（仅取用到的字段） */
+interface ChatCompletionResponse {
+  error?: { message?: string };
+  choices?: Array<{ message?: { content?: string } }>;
+}
+
 // 用给定配置（可以是尚未保存的编辑态）发一条最小请求，验证 URL/Key/模型是否可用
 export async function testAIConnection(config: Pick<AIConfig, 'url' | 'key' | 'model'>): Promise<void> {
   if (!config.url.trim()) throw new Error('请先填写 API Endpoint URL');
@@ -29,9 +35,9 @@ export async function testAIConnection(config: Pick<AIConfig, 'url' | 'key' | 'm
     throw new Error('网络错误：无法访问该地址');
   }
 
-  let data: any = null;
+  let data: ChatCompletionResponse | null = null;
   try {
-    data = await res.json();
+    data = (await res.json()) as ChatCompletionResponse;
   } catch {
     // 非 JSON 响应（如 404 页面），走下方 HTTP 状态判断
   }
@@ -77,19 +83,20 @@ export async function requestAI(
       })
     });
 
-    const data = await res.json();
-    
+    const data = (await res.json()) as ChatCompletionResponse;
+
     if (data.error) {
         throw new Error(data.error.message || "API Error");
     }
 
-    if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content;
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === 'string') {
+      return content;
     } else {
       throw new Error("无响应数据");
     }
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("AI Request Failed:", error);
     throw error; // 抛出错误供 UI 处理
   } finally {

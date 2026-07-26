@@ -72,7 +72,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'prop' | 'inter' | 'style')}
               className={`flex items-center gap-2 py-3 text-sm border-b-2 transition-colors ${activeTab === tab.id ? 'border-iris-500 text-iris-400 font-bold' : 'border-transparent text-subtle hover:text-content'}`}
             >
               <tab.icon size={14} /> {tab.label}
@@ -104,7 +104,7 @@ export function UIEditModal({ component, allPages, onSave, onClose }: UIEditModa
             <div className="space-y-6">
               <div className="bg-surface-3/30 p-4 rounded-lg border border-line-strong">
                 <label className="flex items-center gap-2 text-sm text-content font-bold mb-3"><Zap size={16} className="text-yellow-500"/> 点击动作 (On Click)</label>
-                <select value={interType} onChange={e => setInterType(e.target.value as any)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-content text-sm focus:border-iris-500 outline-none">
+                <select value={interType} onChange={e => setInterType(e.target.value as InteractionType)} className="w-full bg-bg border border-line-strong rounded px-3 py-2 text-content text-sm focus:border-iris-500 outline-none">
                   <option value="none">无动作 (None)</option>
                   <option value="navigate">跳转页面 (Navigate)</option>
                   <option value="open_modal">打开弹窗 (Open Modal)</option>

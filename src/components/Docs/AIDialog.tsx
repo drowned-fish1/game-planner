@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles, ArrowRight, RefreshCw, Check, X, Copy } from 'lucide-react';
 import { requestAI } from '../../utils/aiService';
 
@@ -26,21 +26,7 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (mode !== 'generate' && selectedText) {
-       handleRunAI(selectedText);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const handleRunAI = async (inputContent: string) => {
+  const handleRunAI = useCallback(async (inputContent: string) => {
     setError('');
     setResult('');
     const system = PROMPTS[mode];
@@ -53,10 +39,28 @@ export function AIDialog({ mode, selectedText = '', onInsert, onClose }: AIDialo
     try {
       const text = await requestAI(system, user, setLoading);
       setResult(text);
-    } catch (err: any) {
-      setError(err.message || '请求失败');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '请求失败');
     }
-  };
+  }, [mode, prompt, selectedText]);
+
+  // 打开弹窗时若带选中文本则自动执行一次；用 ref 守卫保证只跑一次
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (autoRanRef.current) return;
+    if (mode !== 'generate' && selectedText) {
+      autoRanRef.current = true;
+      handleRunAI(selectedText);
+    }
+  }, [mode, selectedText, handleRunAI]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>

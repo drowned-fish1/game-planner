@@ -90,8 +90,8 @@ export function Settings() {
     try {
       await testAIConnection(config);
       toast.success(`「${config.name}」连接成功，模型响应正常`);
-    } catch (err: any) {
-      toast.error(`「${config.name}」连接失败：${err?.message || '未知错误'}`);
+    } catch (err) {
+      toast.error(`「${config.name}」连接失败：${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
       setTestingId(null);
     }

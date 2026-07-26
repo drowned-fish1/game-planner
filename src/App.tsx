@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Settings as SettingsIcon,
   Lightbulb,
@@ -18,7 +18,17 @@ import { TeamManager } from './components/Team/TeamManager';
 import { Docs } from './components/Docs/Docs';
 import { UIManager } from './components/UIPrototype/UIManager';
 import { Settings } from './components/Settings/Settings';
-import { loadProjectContent, ProjectContent, ProjectMeta, saveProjectContent } from './utils/storage';
+import {
+  loadProjectContent,
+  saveProjectContent,
+  type BrainstormConnection,
+  type BrainstormItem,
+  type DocItem,
+  type ProjectContent,
+  type ProjectMeta,
+  type TeamMember,
+  type TodoItem,
+} from './utils/storage';
 import { toast } from './utils/toast';
 import { getTheme, setTheme } from './utils/theme';
 import {
@@ -114,7 +124,7 @@ function App() {
     return serviceInfo;
   };
 
-  const disconnectRoom = (preserveServiceInfo = true) => {
+  const disconnectRoom = useCallback((preserveServiceInfo = true) => {
     roomClientRef.current?.disconnect();
     roomClientRef.current = null;
     lastBroadcastSnapshotRef.current = '';
@@ -129,9 +139,9 @@ function App() {
       ...createEmptyRoomSession(),
       serviceInfo: preserveServiceInfo ? prev.serviceInfo : null,
     }));
-  };
+  }, []);
 
-  const schedulePresenceUpdate = (status: string, focusedItemId?: string | null) => {
+  const schedulePresenceUpdate = useCallback((status: string, focusedItemId?: string | null) => {
     if (collaboration.connectionState !== 'connected') return;
 
     queuedPresenceRef.current = { status, focusedItemId };
@@ -149,7 +159,7 @@ function App() {
         focusedItemId: payload.focusedItemId ?? null,
       });
     }, 120);
-  };
+  }, [collaboration.connectionState, activeModule]);
 
   const publishActivity = (activity: {
     kind: string;
@@ -336,14 +346,14 @@ function App() {
     setActiveModule('brainstorm');
   };
 
-  const closeProject = () => {
+  const closeProject = useCallback(() => {
     if (currentProject && projectContent) {
       saveProjectContent(currentProject.id, projectContent);
     }
     disconnectRoom();
     setCurrentProject(null);
     setProjectContent(null);
-  };
+  }, [currentProject, projectContent, disconnectRoom]);
 
   useEffect(() => {
     if (!currentProject || !projectContent) return;
@@ -358,14 +368,14 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [currentProject, projectContent]);
 
-  const saveNow = () => {
+  const saveNow = useCallback(() => {
     if (currentProject && projectContent) {
       setSaveStatus('saving');
       saveProjectContent(currentProject.id, projectContent);
       window.setTimeout(() => setSaveStatus('saved'), 500);
       toast.success('项目已保存');
     }
-  };
+  }, [currentProject, projectContent]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -394,7 +404,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, projectContent, paletteOpen]);
+  }, [currentProject, paletteOpen, saveNow]);
 
   useEffect(() => {
     if (collaboration.connectionState !== 'connected' || !projectContent) return;
@@ -424,16 +434,16 @@ function App() {
   useEffect(() => {
     if (collaboration.connectionState !== 'connected') return;
     schedulePresenceUpdate(moduleStatusLabel(activeModule), null);
-  }, [activeModule, collaboration.connectionState]);
+  }, [activeModule, collaboration.connectionState, schedulePresenceUpdate]);
 
-  const handleBrainstormChange = (newItems: any[], newConnections: any[]) => {
+  const handleBrainstormChange = (newItems: BrainstormItem[], newConnections: BrainstormConnection[]) => {
     setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, brainstorm: { items: newItems, connections: newConnections } };
     });
   };
 
-  const handleUpdateMembers = (newMembers: any[]) => {
+  const handleUpdateMembers = (newMembers: TeamMember[]) => {
     setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, members: newMembers };
@@ -441,21 +451,21 @@ function App() {
     publishActivity({ kind: 'members:update', message: `${profile.name} 更新了团队成员` });
   };
 
-  const handleUpdateTodos = (newTodos: any[]) => {
+  const handleUpdateTodos = (newTodos: TodoItem[]) => {
     setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, todos: newTodos };
     });
   };
 
-  const handleUpdateDocs = (newDocs: any[]) => {
+  const handleUpdateDocs = (newDocs: DocItem[]) => {
     setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, docs: newDocs };
     });
   };
 
-  const handleUpdateUI = (newUIData: any) => {
+  const handleUpdateUI = (newUIData: ProjectContent['ui']) => {
     setProjectContent((prev) => {
       if (!prev) return null;
       return { ...prev, ui: newUIData };
@@ -489,7 +499,7 @@ function App() {
       { id: 'back-home', label: '返回项目大厅', hint: '自动保存后退出', keywords: 'back home dashboard', perform: closeProject },
       { id: 'shortcut-help', label: '查看快捷键', hint: '?', keywords: 'shortcut help keyboard', perform: () => setHelpOpen(true) },
     ];
-  }, [currentProject, projectContent]);
+  }, [currentProject, closeProject, saveNow]);
 
   if (!currentProject) return <Dashboard onOpenProject={openProject} />;
   if (!projectContent) {
@@ -544,11 +554,11 @@ interface ProjectEditorLayoutProps {
   remoteParticipants: RoomSessionState['participants'];
   onBack: () => void;
   onSetActiveModule: (module: ModuleType) => void;
-  onBrainstormChange: (items: any[], connections: any[]) => void;
-  onUpdateMembers: (members: any[]) => void;
-  onUpdateTodos: (todos: any[]) => void;
-  onUpdateDocs: (docs: any[]) => void;
-  onUpdateUI: (uiData: any) => void;
+  onBrainstormChange: (items: BrainstormItem[], connections: BrainstormConnection[]) => void;
+  onUpdateMembers: (members: TeamMember[]) => void;
+  onUpdateTodos: (todos: TodoItem[]) => void;
+  onUpdateDocs: (docs: DocItem[]) => void;
+  onUpdateUI: (uiData: ProjectContent['ui']) => void;
   onUpdateProfile: (profile: CollaborationProfile) => void;
   onHostRoom: (roomId: string) => Promise<void>;
   onJoinRoom: (serverUrl: string, roomId: string) => Promise<void>;
@@ -747,7 +757,15 @@ function ProjectEditorLayout({
   );
 }
 
-function SidebarBtn({ icon, label, hint, isActive, onClick }: any) {
+interface SidebarBtnProps {
+  icon: JSX.Element;
+  label: string;
+  hint?: string;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+function SidebarBtn({ icon, label, hint, isActive, onClick }: SidebarBtnProps) {
   return (
     <button onClick={onClick} className={`nav-item ${isActive ? 'nav-item-active' : ''}`}>
       {isActive && (
@@ -766,7 +784,7 @@ function SidebarBtn({ icon, label, hint, isActive, onClick }: any) {
   );
 }
 
-function MobileNavBtn({ icon, label, isActive, onClick }: any) {
+function MobileNavBtn({ icon, label, isActive, onClick }: Omit<SidebarBtnProps, 'hint'>) {
   return (
     <button
       onClick={onClick}
