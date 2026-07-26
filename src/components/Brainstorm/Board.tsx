@@ -105,14 +105,28 @@ export function BrainstormBoard({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 768));
   const [isMiddlePanning, setIsMiddlePanning] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
   const middlePanRef = useRef<{ startX: number; startY: number; originX: number; originY: number; active: boolean } | null>(null);
+  const marqueeRef = useRef<{ startX: number; startY: number; active: boolean; moved: boolean } | null>(null);
+  const suppressCanvasClickRef = useRef(false);
+  const itemsRef = useRef<BoardItem[]>(items);
+  const selectedIdsRef = useRef(selectedIds);
 
   const updateXarrow = useXarrow();
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    selectedIdsRef.current = selectedIds;
+  }, [selectedIds]);
 
   useEffect(() => {
     if (!hasInitialized.current) {
@@ -164,6 +178,104 @@ export function BrainstormBoard({
     syncXarrowTransformVars(state);
     updateXarrow();
   }, [syncXarrowTransformVars, updateXarrow]);
+
+  // 屏幕坐标 → 画布坐标（含缩放/平移）
+  const toCanvasPoint = useCallback((clientX: number, clientY: number) => {
+    const captureEl = captureRef.current;
+    const state = transformComponentRef.current?.instance.transformState;
+    if (!captureEl || !state || !state.scale) return null;
+    const rect = captureEl.getBoundingClientRect();
+    return { x: (clientX - rect.left) / state.scale, y: (clientY - rect.top) / state.scale };
+  }, []);
+
+  // 桌面端框选：空白画布左键拖动
+  const handleCanvasMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDesktop || event.button !== 0) return;
+    if (event.target !== event.currentTarget) return;
+    const pt = toCanvasPoint(event.clientX, event.clientY);
+    if (!pt) return;
+    marqueeRef.current = { startX: pt.x, startY: pt.y, active: true, moved: false };
+  }, [isDesktop, toCanvasPoint]);
+
+  useEffect(() => {
+    if (!isDesktop || typeof window === 'undefined') return undefined;
+
+    const handleMove = (event: MouseEvent) => {
+      const marquee = marqueeRef.current;
+      if (!marquee?.active) return;
+      const pt = toCanvasPoint(event.clientX, event.clientY);
+      if (!pt) return;
+      const dx = pt.x - marquee.startX;
+      const dy = pt.y - marquee.startY;
+      if (!marquee.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      marquee.moved = true;
+      setMarqueeRect({
+        x: Math.min(marquee.startX, pt.x),
+        y: Math.min(marquee.startY, pt.y),
+        w: Math.abs(dx),
+        h: Math.abs(dy),
+      });
+    };
+
+    const handleUp = (event: MouseEvent) => {
+      const marquee = marqueeRef.current;
+      if (!marquee?.active) return;
+      marqueeRef.current = null;
+      setMarqueeRect(null);
+      if (!marquee.moved) return;
+      suppressCanvasClickRef.current = true;
+      const pt = toCanvasPoint(event.clientX, event.clientY);
+      if (!pt) return;
+      const rx1 = Math.min(marquee.startX, pt.x);
+      const ry1 = Math.min(marquee.startY, pt.y);
+      const rx2 = Math.max(marquee.startX, pt.x);
+      const ry2 = Math.max(marquee.startY, pt.y);
+      const hit = itemsRef.current
+        .filter((item) => {
+          const w = item.width ?? 200;
+          const h = item.height ?? 150;
+          return item.x < rx2 && item.x + w > rx1 && item.y < ry2 && item.y + h > ry1;
+        })
+        .map((item) => item.id);
+      setSelectedIds(new Set(hit));
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDesktop, toCanvasPoint]);
+
+  // 多选：Delete/Backspace 批量删除，Esc 取消选择
+  useEffect(() => {
+    if (!isDesktop || typeof window === 'undefined') return undefined;
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (selectedIdsRef.current.size > 0) setSelectedIds(new Set());
+        return;
+      }
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const current = selectedIdsRef.current;
+      if (current.size === 0) return;
+      event.preventDefault();
+      setItems((prev) => prev.filter((entry) => !current.has(entry.id)));
+      setConnections((prev) => prev.filter((connection) => !current.has(connection.start) && !current.has(connection.end)));
+      setSelectedIds(new Set());
+      onActivity?.({
+        kind: 'brainstorm:delete',
+        message: `批量删除了 ${current.size} 张磁贴`,
+        status: '刚批量删除磁贴',
+      });
+    };
+
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isDesktop, onActivity]);
 
   const otherEditors = participants.filter(
     (participant) => participant.connectionId !== selfConnectionId && participant.presence.activeModule === 'brainstorm',
@@ -559,12 +671,26 @@ export function BrainstormBoard({
             }}
             onDrop={handleDrop}
             onDragOver={(event) => event.preventDefault()}
+            onMouseDown={handleCanvasMouseDown}
             onClick={() => {
+              if (suppressCanvasClickRef.current) {
+                suppressCanvasClickRef.current = false;
+                return;
+              }
               if (mode === 'connect') setConnectSourceId(null);
-              if (isDesktop) setPendingConnection(null);
+              if (isDesktop) {
+                setPendingConnection(null);
+                setSelectedIds((current) => (current.size > 0 ? new Set<string>() : current));
+              }
               if (isConnected) onPresenceChange?.('正在浏览白板', null);
             }}
           >
+            {marqueeRect && (
+              <div
+                className="pointer-events-none absolute z-[90] rounded border border-brand-400/80 bg-brand-500/10"
+                style={{ left: marqueeRect.x, top: marqueeRect.y, width: marqueeRect.w, height: marqueeRect.h }}
+              />
+            )}
             <Xwrapper>
               {items.map((item) => (
                 <div
@@ -594,7 +720,7 @@ export function BrainstormBoard({
                     isDesktop={isDesktop}
                     showConnectionHandles={isDesktop ? pendingConnection?.itemId === item.id : true}
                     activeConnectHandle={pendingConnection?.itemId === item.id ? pendingConnection.handle : null}
-                    isSelected={connectSourceId === item.id || pendingConnection?.itemId === item.id}
+                    isSelected={connectSourceId === item.id || pendingConnection?.itemId === item.id || selectedIds.has(item.id)}
                     inputs={item.type === 'ai' ? getAIInputs(item.id) : undefined}
                     onUpdate={(id, text) => {
                       setItems((prev) => prev.map((entry) => (entry.id === id ? { ...entry, content: text } : entry)));
@@ -609,6 +735,12 @@ export function BrainstormBoard({
                       setItems((prev) => prev.filter((entry) => entry.id !== id));
                       setConnections((prev) => prev.filter((connection) => connection.start !== id && connection.end !== id));
                       setPendingConnection((current) => (current?.itemId === id ? null : current));
+                      setSelectedIds((current) => {
+                        if (!current.has(id)) return current;
+                        const next = new Set(current);
+                        next.delete(id);
+                        return next;
+                      });
                       onActivity?.({
                         kind: 'brainstorm:delete',
                         itemId: id,
@@ -617,7 +749,44 @@ export function BrainstormBoard({
                       });
                     }}
                     onDrag={(id, x, y) => {
-                      setItems((prev) => prev.map((entry) => (entry.id === id ? { ...entry, x, y } : entry)));
+                      setItems((prev) => {
+                        const dragged = prev.find((entry) => entry.id === id);
+                        if (!dragged) return prev;
+
+                        const group = selectedIdsRef.current.has(id) && selectedIdsRef.current.size > 1
+                          ? selectedIdsRef.current
+                          : null;
+
+                        // 基础对齐吸附：靠近其他磁贴的左/中/右、上/中/下边线时吸附（8px 画布单位）
+                        const SNAP = 8;
+                        const w = dragged.width ?? 200;
+                        const h = dragged.height ?? 150;
+                        let nx = x;
+                        let ny = y;
+                        let bestXDist = SNAP;
+                        let bestYDist = SNAP;
+                        for (const other of prev) {
+                          if (other.id === id || (group && group.has(other.id))) continue;
+                          const ow = other.width ?? 200;
+                          const oh = other.height ?? 150;
+                          for (const cx of [other.x, other.x + ow / 2 - w / 2, other.x + ow - w]) {
+                            const d = Math.abs(x - cx);
+                            if (d < bestXDist) { bestXDist = d; nx = cx; }
+                          }
+                          for (const cy of [other.y, other.y + oh / 2 - h / 2, other.y + oh - h]) {
+                            const d = Math.abs(y - cy);
+                            if (d < bestYDist) { bestYDist = d; ny = cy; }
+                          }
+                        }
+
+                        // 多选时拖动任意选中磁贴，整组平移
+                        if (group) {
+                          const dx = nx - dragged.x;
+                          const dy = ny - dragged.y;
+                          return prev.map((entry) => (group.has(entry.id) ? { ...entry, x: entry.x + dx, y: entry.y + dy } : entry));
+                        }
+                        return prev.map((entry) => (entry.id === id ? { ...entry, x: nx, y: ny } : entry));
+                      });
                       updateXarrow();
                       onPresenceChange?.('正在移动磁贴', id);
                     }}
@@ -772,9 +941,15 @@ export function BrainstormBoard({
       </div>
 
       <div data-board-overlay="true" className="pointer-events-none absolute bottom-4 left-4 hidden text-xs text-muted/80 md:block">
-        {mode === 'pan' && '当前: 浏览模式 (拖动画布 / 缩放白板)'}
-        {mode === 'edit' && '当前: 编辑模式 (移动卡片 / 调整尺寸)'}
-        {mode === 'connect' && '当前: 连线模式 (点击两张卡片建立连接)'}
+        {selectedIds.size > 0
+          ? `已选 ${selectedIds.size} 张磁贴 (拖动任意选中磁贴整体移动 / Delete 批量删除 / Esc 取消)`
+          : (
+            <>
+              {mode === 'pan' && '当前: 浏览模式 (拖动画布 / 缩放白板)'}
+              {mode === 'edit' && '当前: 编辑模式 (移动卡片 / 空白处拖动框选)'}
+              {mode === 'connect' && '当前: 连线模式 (点击两张卡片建立连接)'}
+            </>
+          )}
       </div>
     </div>
   );

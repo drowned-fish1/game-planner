@@ -27,6 +27,9 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['鼠标中键拖动'], desc: '平移画布' },
       { keys: ['滚轮'], desc: '缩放画布' },
       { keys: ['点击连接点 ×2'], desc: '连接两张磁贴' },
+      { keys: ['空白处左键拖动'], desc: '框选多张磁贴' },
+      { keys: ['Delete'], desc: '删除选中的磁贴' },
+      { keys: ['拖动选中磁贴'], desc: '整组移动（自动对齐吸附）' },
     ],
   },
 ];
