@@ -11,6 +11,8 @@ import {
   CircleDot,
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import { CommandPalette, type CommandAction } from './components/CommandPalette';
+import { ShortcutHelp } from './components/ShortcutHelp';
 import { BrainstormBoard } from './components/Brainstorm/Board';
 import { TeamManager } from './components/Team/TeamManager';
 import { Docs } from './components/Docs/Docs';
@@ -63,6 +65,8 @@ function App() {
   const [activeModule, setActiveModule] = useState<ModuleType>('brainstorm');
   const [collaboration, setCollaboration] = useState<RoomSessionState>(createEmptyRoomSession);
   const [profile, setProfile] = useState<CollaborationProfile>(() => loadCollaborationProfile());
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const roomClientRef = useRef<RoomClient | null>(null);
   const projectContentRef = useRef<ProjectContent | null>(null);
@@ -344,22 +348,43 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [currentProject, projectContent]);
 
+  const saveNow = () => {
+    if (currentProject && projectContent) {
+      setSaveStatus('saving');
+      saveProjectContent(currentProject.id, projectContent);
+      window.setTimeout(() => setSaveStatus('saved'), 500);
+      toast.success('项目已保存');
+    }
+  };
+
   useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        if (currentProject && projectContent) {
-          setSaveStatus('saving');
-          saveProjectContent(currentProject.id, projectContent);
-          window.setTimeout(() => setSaveStatus('saved'), 500);
-          toast.success('项目已保存');
-        }
+        saveNow();
+        return;
+      }
+      if (!currentProject) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setHelpOpen(false);
+        setPaletteOpen((prev) => !prev);
+        return;
+      }
+      if (e.key === '?' && !isTypingTarget(e.target) && !paletteOpen) {
+        e.preventDefault();
+        setHelpOpen((prev) => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, projectContent]);
+  }, [currentProject, projectContent, paletteOpen]);
 
   useEffect(() => {
     if (collaboration.connectionState !== 'connected' || !projectContent) return;
@@ -432,6 +457,23 @@ function App() {
     [collaboration.participants, collaboration.selfConnectionId],
   );
 
+  const paletteActions = useMemo<CommandAction[]>(() => {
+    if (!currentProject) return [];
+    return [
+      ...MODULES.map((m) => ({
+        id: `goto-${m.id}`,
+        label: `跳转：${m.label}`,
+        hint: m.hint,
+        keywords: m.id,
+        perform: () => setActiveModule(m.id),
+      })),
+      { id: 'goto-settings', label: '跳转：设置', hint: 'AI 服务配置', keywords: 'settings', perform: () => setActiveModule('settings') },
+      { id: 'save', label: '保存项目', hint: 'Ctrl+S', keywords: 'save', perform: saveNow },
+      { id: 'back-home', label: '返回项目大厅', hint: '自动保存后退出', keywords: 'back home dashboard', perform: closeProject },
+      { id: 'shortcut-help', label: '查看快捷键', hint: '?', keywords: 'shortcut help keyboard', perform: () => setHelpOpen(true) },
+    ];
+  }, [currentProject, projectContent]);
+
   if (!currentProject) return <Dashboard onOpenProject={openProject} />;
   if (!projectContent) {
     return (
@@ -468,6 +510,8 @@ function App() {
         onActivity={publishActivity}
         remoteParticipants={teamParticipants}
       />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} />
+      <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
