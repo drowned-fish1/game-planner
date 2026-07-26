@@ -87,7 +87,15 @@
 10. 大厅：项目「创建副本」、`Ctrl/Cmd+N` 新建、首次空状态、排序偏好持久化。
 11. UI 原型机首页：空状态、界面计数、Esc 关闭、模板弹窗响应式。
 12. 房间/文档弹窗补 Esc，全局弹窗交互一致。
-13. 白板空画布引导：`Board.tsx` 无便签时画布中央显示居中提示（覆盖层不随缩放，`pointer-events-none` 不挡操作）。
+13. 白板空画布引导：`Board.tsx` 无便签时画布中央显示居中提示（覆盖层不随缩放，`pointer-events-none` 不挡操作）。已在浏览器实测三态（空显示/加贴消失/删贴恢复）。
+14. 修复 `Board.tsx` 中 7 处编码损坏的协作状态乱码文案。
+15. `AIDialog.tsx` 支持 Esc 关闭，关闭/提交按钮补无障碍属性。
+16. Settings 增强：API Key 眼睛显隐切换、每配置「测试连接」按钮（`aiService.testAIConnection`，区分网络/API/HTTP/格式错误，toast 反馈）；标题行窄屏 flex-wrap。已在浏览器实测。
+17. 全项目图标按钮可发现性与键盘可达性：56 处补 title/aria-label/role/tabIndex/onKeyDown（工作流并行修复），浏览器实测大厅 0 无名图标按钮、Enter 可开项目卡。
+18. 移动端响应式：UICanvas 顶栏收缩约束与右键菜单视口钳制、TeamManager md 堆叠 lg 分栏 + break-all、375px 实测五模块无横向溢出。
+19. 项目导入/导出：`storage.exportProject/importProject`（format/version 校验、新 id 深拷贝），Dashboard 顶栏「导入」+ 右键「导出项目」，合法/非法文件路径均实测。
+20. 命令面板（Ctrl+K，搜索/方向键/Enter）与快捷键帮助（?）：`CommandPalette.tsx` + `ShortcutHelp.tsx`，App 集成（输入框聚焦时 ? 不触发），全链路实测。
+21. 遗留配色迁移（AI 卡 purple→iris 等、Board 导出底色/网格点/连线色、UIPrototype 常量化）；**修复状态磁贴无法移动/删除**（此前不渲染拖拽栏，现覆盖式 h-6 栏）。
 
 ---
 
@@ -97,15 +105,15 @@
 
 ### P1 — 打磨与一致性
 - ~~**[白板空画布引导]**~~ ✅ 已完成（迭代 13）
-- **[图标按钮可发现性]** 全项目：给纯图标按钮补 `title` 与 `aria-label`（尤其 Board 工具条、Docs 侧栏、UICanvas 顶栏）。验收：悬浮有中文提示，无控制台无障碍报错。
-- **[AIDialog Esc 一致性]** `Docs/AIDialog.tsx`：加 Esc 关闭（现只有点遮罩关闭）。
-- **[移动端响应式复查]** `Team/TeamManager.tsx`（roomPanel 三列网格在窄屏堆叠）、`UIPrototype/UICanvas.tsx`（顶栏工具挤压）。验收：≤ 400px 宽不横向溢出。
-- **[Settings 增强]** `Settings/Settings.tsx`：API Key 显示/隐藏切换（眼睛图标）；“测试连接”按钮（调 `utils/aiService.ts` 发一条最小请求，用 toast 反馈）。
+- ~~**[图标按钮可发现性]**~~ ✅ 已完成（迭代 17）
+- ~~**[AIDialog Esc 一致性]**~~ ✅ 已完成（迭代 15）
+- ~~**[移动端响应式复查]**~~ ✅ 已完成（迭代 18）
+- ~~**[Settings 增强]**~~ ✅ 已完成（迭代 16）
 
 ### P2 — 功能增量
-- **[项目导入/导出]** `Dashboard.tsx` + `utils/storage.ts`：单项目导出为 `.json`（meta+content），导入时新建项目并深拷贝。复用 `confirmDialog`/`toast`。
+- ~~**[项目导入/导出]**~~ ✅ 已完成（迭代 19）
 - **[白板多选与对齐]** `Board.tsx`：框选、批量移动/删除、基础对齐吸附。风险中，注意 `onDataChange` 回传结构不变。
-- **[命令面板 / 快捷键帮助]** 新增 `components/CommandPalette.tsx`：`Ctrl/Cmd+K` 打开，列出模块跳转与常用动作；再加一个 `?` 快捷键帮助浮层。
+- ~~**[命令面板 / 快捷键帮助]**~~ ✅ 已完成（迭代 20）
 - **[浅色主题]** 令牌已就绪：在 `index.css` 增加 `:root.light { --bg…}` 覆盖，`App`/`Settings` 加主题切换并存 localStorage；`html` 上切 `light`/`dark` 类。
 
 ### P3 — 工程化
