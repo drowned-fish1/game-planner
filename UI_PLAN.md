@@ -100,6 +100,7 @@
 23. 浅色主题：主题令牌、切换入口与本地偏好持久化。
 24. 质量门禁：pre-commit 执行 TypeScript、ESLint 和单元测试；补齐 `storage` 与 `normalizeRoomServerUrl` 关键路径测试。
 25. 全链路回归（见 `REGRESSION_CHECKLIST.md`）：生产构建下大厅/白板/文档/联机/UI 原型/设置全量验证（桌面+375px、深浅色）；修复 Electron dev 硬编码 5173 端口导致端口被占时加载错误应用的缺陷（改用 `VITE_DEV_SERVER_URL`）。
+26.6. （迭代 28）核心测试补充：总计 67 用例。新增 theme（8）、aiService（10，fetch 全打桩不依赖外网）、boardGeometry（框选矩形/碰撞/吸附纯函数 12）；storage 增补 IPC 读写失败、localStorage 读写失败、旧版存档缺字段迁移、导入深拷贝与字段清洗；Board 框选/碰撞/吸附逻辑提取到 `Brainstorm/boardGeometry.ts`（浏览器实测拖动/吸附/框选/批删行为不变）；storage 补上保存路径 IPC 异常与读取路径 localStorage 异常的防护。
 26.5. （迭代 27）ESLint 清零：51 warnings → 0，`lint` 恢复 `--max-warnings 0`；hooks 依赖以 useCallback 正确修复（AIDialog 自动执行加 ref 守卫防重复触发）；any 全部替换为明确类型（storage 新增 BrainstormItem/Connection 等）；toast/confirm 拆分为 store（utils/*.ts）+ 组件（components/Toaster.tsx、ConfirmHost.tsx）解决 Fast Refresh 警告。注意：`import { toast } from '../utils/toast'` 路径不变。
 26. 协作健壮性：修复 connect Promise 在 joined 前 close/error/超时时永久挂起；异常断线自动重连（指数退避+上限+抖动，成功后重置，`getLatestSnapshot` 让房主重启后用最新内容重建房间）；手动退出取消一切定时器与重连；代号(generation)机制防重复连接/重复监听/重复 disconnected。纯逻辑拆到 `utils/roomConnection.ts`（退避/判定/解析 12 用例），`RoomClient` 支持注入 Fake WebSocket/假定时器（9 用例）；`scripts/verify-collab.mjs` 用两个真实客户端对接真实 CollabServer 验证加入/同步/断网/服务重启/恢复/退出，浏览器 UI 亦实测断线重连全流程。
 

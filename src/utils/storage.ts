@@ -160,8 +160,12 @@ const loadGlobalStore = (): GlobalStore => {
       console.error("IPC Load Error", e);
     }
   } else {
-    // 浏览器环境 fallback (仅用于调试)
-    rawData = localStorage.getItem('gp_all_data');
+    // 浏览器环境 fallback (仅用于调试)；隐私模式等场景下 getItem 也可能抛错
+    try {
+      rawData = localStorage.getItem('gp_all_data');
+    } catch (e) {
+      console.error("LocalStorage Load Error", e);
+    }
   }
 
   if (!rawData) {
@@ -182,14 +186,18 @@ const saveGlobalStore = (store: GlobalStore) => {
   const rawData = JSON.stringify(store);
 
   if (api && api.sendSync) {
-    // Electron 环境：写入硬盘
-    api.sendSync('save-data-sync', rawData);
+    // Electron 环境：写入硬盘；IPC 失败不应让保存调用方崩溃
+    try {
+      api.sendSync('save-data-sync', rawData);
+    } catch (e) {
+      console.error("IPC Save Error", e);
+    }
   } else {
     // 浏览器环境 fallback
     try {
       localStorage.setItem('gp_all_data', rawData);
     } catch (e) {
-      console.error("LocalStorage quota exceeded");
+      console.error("LocalStorage quota exceeded", e);
     }
   }
 };

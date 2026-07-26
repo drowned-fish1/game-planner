@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { NoteCard, type ConnectorHandle } from './NoteCard';
+import { itemsIntersectingRect, marqueeRectFrom, snapDraggedPosition } from './boardGeometry';
 import type { RoomParticipant } from '../../utils/collaboration';
 
 interface BoardItem {
@@ -209,12 +210,7 @@ export function BrainstormBoard({
       const dy = pt.y - marquee.startY;
       if (!marquee.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
       marquee.moved = true;
-      setMarqueeRect({
-        x: Math.min(marquee.startX, pt.x),
-        y: Math.min(marquee.startY, pt.y),
-        w: Math.abs(dx),
-        h: Math.abs(dy),
-      });
+      setMarqueeRect(marqueeRectFrom({ x: marquee.startX, y: marquee.startY }, pt));
     };
 
     const handleUp = (event: MouseEvent) => {
@@ -226,17 +222,7 @@ export function BrainstormBoard({
       suppressCanvasClickRef.current = true;
       const pt = toCanvasPoint(event.clientX, event.clientY);
       if (!pt) return;
-      const rx1 = Math.min(marquee.startX, pt.x);
-      const ry1 = Math.min(marquee.startY, pt.y);
-      const rx2 = Math.max(marquee.startX, pt.x);
-      const ry2 = Math.max(marquee.startY, pt.y);
-      const hit = itemsRef.current
-        .filter((item) => {
-          const w = item.width ?? 200;
-          const h = item.height ?? 150;
-          return item.x < rx2 && item.x + w > rx1 && item.y < ry2 && item.y + h > ry1;
-        })
-        .map((item) => item.id);
+      const hit = itemsIntersectingRect(itemsRef.current, { x: marquee.startX, y: marquee.startY }, pt);
       setSelectedIds(new Set(hit));
     };
 
@@ -758,26 +744,7 @@ export function BrainstormBoard({
                           : null;
 
                         // 基础对齐吸附：靠近其他磁贴的左/中/右、上/中/下边线时吸附（8px 画布单位）
-                        const SNAP = 8;
-                        const w = dragged.width ?? 200;
-                        const h = dragged.height ?? 150;
-                        let nx = x;
-                        let ny = y;
-                        let bestXDist = SNAP;
-                        let bestYDist = SNAP;
-                        for (const other of prev) {
-                          if (other.id === id || (group && group.has(other.id))) continue;
-                          const ow = other.width ?? 200;
-                          const oh = other.height ?? 150;
-                          for (const cx of [other.x, other.x + ow / 2 - w / 2, other.x + ow - w]) {
-                            const d = Math.abs(x - cx);
-                            if (d < bestXDist) { bestXDist = d; nx = cx; }
-                          }
-                          for (const cy of [other.y, other.y + oh / 2 - h / 2, other.y + oh - h]) {
-                            const d = Math.abs(y - cy);
-                            if (d < bestYDist) { bestYDist = d; ny = cy; }
-                          }
-                        }
+                        const { x: nx, y: ny } = snapDraggedPosition(dragged, x, y, prev, group);
 
                         // 多选时拖动任意选中磁贴，整组平移
                         if (group) {

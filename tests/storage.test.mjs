@@ -162,4 +162,122 @@ describe('storage browser fallback', () => {
       content,
     })));
   });
+
+  test('imported content is deep-copied and edge fields are sanitized', () => {
+    const source = {
+      format: 'game-planner-project',
+      version: 1,
+      exportedAt: 1,
+      meta: { id: 'orig', name: '   ', cover: 12345, lastModified: 1 },
+      content: storage.loadProjectContent('missing'),
+    };
+    const imported = storage.importProject(JSON.stringify(source));
+    // 空白名/非法封面回退
+    assert.equal(imported.name, '导入的项目');
+    assert.equal(imported.cover, '');
+
+    // 深拷贝：改导入后的内容不影响再次导入
+    const stored = readStore();
+    stored.contents[imported.id].docs.push({ id: 'x', title: 't', content: '', parentId: null });
+    memory.set(STORE_KEY, JSON.stringify(stored));
+    const imported2 = storage.importProject(JSON.stringify(source));
+    assert.deepEqual(readStore().contents[imported2.id].docs, []);
+  });
+
+  test('export of a missing project returns null', () => {
+    assert.equal(storage.exportProject('ghost'), null);
+  });
+
+  test('localStorage read failures fall back to safe defaults', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      globalThis.localStorage.getItem = () => { throw new Error('privacy mode'); };
+      assert.deepEqual(storage.getProjectsList(), []);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('localStorage write failures do not crash the save call', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      globalThis.localStorage.setItem = () => { throw new Error('quota exceeded'); };
+      assert.doesNotThrow(() => storage.saveProjectsList([{ id: 'p', name: 'n', cover: '', lastModified: 1 }]));
+    } finally {
+      console.error = originalError;
+    }
+  });
+});
+
+describe('storage electron IPC', () => {
+  test('loads via sendSync and survives IPC read failures', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      // 正常读取
+      globalThis.window = {
+        electronAPI: {
+          sendSync: (channel) => (channel === 'load-data-sync'
+            ? JSON.stringify({ projects: [{ id: 'e1', name: 'Electron 项目', cover: '', lastModified: 1 }], contents: {}, configs: {} })
+            : null),
+        },
+      };
+      assert.equal(storage.getProjectsList()[0].name, 'Electron 项目');
+
+      // IPC 抛错 → 安全默认值
+      globalThis.window = {
+        electronAPI: { sendSync: () => { throw new Error('ipc dead'); } },
+      };
+      assert.deepEqual(storage.getProjectsList(), []);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('IPC write failures do not crash the save call', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      let loadCalls = 0;
+      globalThis.window = {
+        electronAPI: {
+          sendSync: (channel) => {
+            if (channel === 'load-data-sync') { loadCalls += 1; return null; }
+            throw new Error('disk full');
+          },
+        },
+      };
+      assert.doesNotThrow(() => storage.saveProjectsList([{ id: 'p', name: 'n', cover: '', lastModified: 1 }]));
+      assert.ok(loadCalls > 0);
+    } finally {
+      console.error = originalError;
+    }
+  });
+});
+
+describe('storage legacy archives', () => {
+  test('page without type/components gets defaults without touching valid data', () => {
+    memory.set(STORE_KEY, JSON.stringify({
+      projects: [],
+      configs: {},
+      contents: {
+        old: {
+          brainstorm: { items: [{ id: 'n1', type: 'text', content: 'hi', x: 1, y: 2 }], connections: [] },
+          members: [],
+          todos: [],
+          docs: [],
+          ui: { pages: [{ id: 'p1', name: '旧页面', width: 100, height: 100, backgroundColor: '#000' }] },
+        },
+      },
+    }));
+
+    const content = storage.loadProjectContent('old');
+    assert.equal(content.ui.pages[0].type, 'screen');
+    assert.deepEqual(content.ui.pages[0].components, []);
+    assert.deepEqual(content.assets, []);
+    // 原有数据原样保留
+    assert.equal(content.brainstorm.items[0].content, 'hi');
+  });
 });
