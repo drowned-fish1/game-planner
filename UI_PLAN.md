@@ -1,0 +1,137 @@
+# Game Planner Pro — UI 优化与后续开发计划
+
+> 交接文档。给本地 Claude Code / 开发者：请**遵守第 2 节的设计系统约定**，然后按第 4 节的路线图一轮一轮迭代，每轮改动后跑第 5 节的校验命令再提交。
+
+---
+
+## 0. 如何使用本文件（给 Claude Code 的说明）
+
+- 每次只做一个「迭代」（第 4 节里的一个条目），改完 → `npm run build`（真正的类型检查在这里）→ 自测 → 提交。
+- **不要**破坏第 2 节的令牌体系；新代码一律用语义令牌和组件原语，不要再写死 `slate-*` / `emerald-*`。
+- 涉及网络/协作（`src/utils/collaboration.ts`、`electron/`）的改动风险高，改前先本地联机自测。
+- 文案是中文，保持一致。
+
+---
+
+## 1. 项目现状
+
+- 技术栈：Electron + React 18 + TypeScript + Vite + TailwindCSS 3 + Capacitor（安卓）。TipTap 富文本、@xyflow、react-draggable/resizable 等。
+- 入口：`src/main.tsx` → `<ErrorBoundary><App/></ErrorBoundary>` + `<Toaster/>` + `<ConfirmHost/>`。
+- 主要模块（`src/components/`）：
+  - `Dashboard/` 项目大厅
+  - `Brainstorm/` 灵感白板（`Board.tsx` 深色画布；`NoteCard.tsx` **浅色便签**）
+  - `Team/` 房间联机 + 待办
+  - `Docs/` 策划文档（TipTap）
+  - `UIPrototype/` UI 原型机
+  - `Settings/` AI 配置
+- 数据：`src/utils/storage.ts`（Electron 走 IPC 存硬盘，浏览器走 localStorage）。
+
+---
+
+## 2. 设计系统约定（务必遵守）
+
+### 2.1 颜色令牌（定义于 `src/index.css` 的 `:root`，映射在 `tailwind.config.js`）
+
+| 语义类               | 用途                     |
+|----------------------|--------------------------|
+| `bg`                 | 应用最底层背景           |
+| `surface`            | 面板 / 卡片              |
+| `surface-2`          | 抬升面板                 |
+| `surface-3`          | 悬浮 / 更亮的块          |
+| `line`               | 默认描边                 |
+| `line-strong`        | 强调描边                 |
+| `content`            | 主文字                   |
+| `muted`              | 次要文字                 |
+| `subtle`            | 三级文字 / 占位符        |
+| `brand` / `brand-50…900` | 主强调色（薄荷绿，= emerald-500） |
+| `iris-300…700`       | 次强调色（紫，用于 AI/原型） |
+
+用法：`bg-surface`、`text-muted`、`border-line`、`bg-brand-500/10`、`text-iris-400` …都支持 `/透明度`。
+
+### 2.2 组件原语（`@layer components`，见 `src/index.css`）
+
+- 按钮：`.btn` `.btn-primary` `.btn-outline` `.btn-ghost` `.btn-danger`
+- 容器：`.card` `.panel` `.glass`
+- 表单：`.input`
+- 其它：`.chip` `.nav-item` / `.nav-item-active` `.toast`
+- 动画：`animate-fade-in` `animate-fade-in-up` `animate-scale-in` `animate-toast-in`；文字渐变 `.text-gradient-brand`
+
+### 2.3 通用工具（新增，优先复用而非重造）
+
+- **Toast**：`import { toast } from '@/utils/toast'` → `toast.success/error/warning/info(msg)`。`<Toaster/>` 已在 `main.tsx` 挂载。最多同时 4 条。
+- **确认框**：`import { confirmDialog } from '@/utils/confirm'` → `if (await confirmDialog({ title, message?, confirmText?, danger? })) {…}`。**禁止再用原生 `alert/confirm`**。
+- **错误边界**：`src/components/ErrorBoundary.tsx` 已包裹全局，防白屏。
+
+### 2.4 迁移映射（如遇仍是旧配色的地方，按此换）
+
+- `bg-slate-900/950 → bg-bg`；`bg-slate-800 → bg-surface`；`bg-slate-700/600 → bg-surface-3`
+- `border-slate-700/800 → border-line`；`border-slate-600/500 → border-line-strong`
+- `text-slate-200/300 → text-content`；`text-slate-400 → text-muted`；`text-slate-500/600/700 → text-subtle`
+- `emerald-* → brand-*`（同色号）；`purple-* → iris-*`（色号映射到 300–700）
+- **例外**：`Brainstorm/NoteCard.tsx` 是画布上的**浅色便签**（白/米黄底 + 深色字），**不要**迁到深色令牌。默认状态色（red/yellow/blue 等语义色）保留。
+- Tailwind 默认 `slate/emerald/purple` 仍在，旧存档数据不会因迁移而失效。
+
+---
+
+## 3. 已完成（迭代 1–12）
+
+1. 设计系统：`tailwind.config.js` + `src/index.css`（令牌、字体、阴影、滚动条、焦点环、原语）。
+2. 应用外壳 `App.tsx`（侧栏/顶栏/移动导航/保存状态）——仅改表现，协作逻辑原样保留。
+3. 项目大厅 `Dashboard.tsx`（搜索、排序、封面悬浮、相对时间、右键/⋮ 菜单）。
+4. 五大模块配色迁移（Settings/Docs/Team/TodoList/Board/UIPrototype 全套）。
+5. 富文本（TipTap `prose`）+ 原生 `select`/复选框/占位符主题化。
+6. Toast 通知系统（`utils/toast.tsx`）。
+7. 应用内确认框（`utils/confirm.tsx`），并**清除全部原生 alert/confirm**。
+8. 全局 ErrorBoundary、`prefers-reduced-motion`、Toast/确认框无障碍。
+9. 协作模块：浏览器端消息解析加 `try/catch` 防坏帧崩溃。
+10. 大厅：项目「创建副本」、`Ctrl/Cmd+N` 新建、首次空状态、排序偏好持久化。
+11. UI 原型机首页：空状态、界面计数、Esc 关闭、模板弹窗响应式。
+12. 房间/文档弹窗补 Esc，全局弹窗交互一致。
+
+---
+
+## 4. 待办路线图（按优先级）
+
+> 每条都是一个「迭代」。改动文件与验收标准已列出。
+
+### P1 — 打磨与一致性
+- **[白板空画布引导]** `Brainstorm/Board.tsx`：当无任何便签时，画布中央显示一条居中提示（“点击右下角 ＋ 添加第一个灵感”）。验收：有便签时不显示，空时显示且不挡操作。
+- **[图标按钮可发现性]** 全项目：给纯图标按钮补 `title` 与 `aria-label`（尤其 Board 工具条、Docs 侧栏、UICanvas 顶栏）。验收：悬浮有中文提示，无控制台无障碍报错。
+- **[AIDialog Esc 一致性]** `Docs/AIDialog.tsx`：加 Esc 关闭（现只有点遮罩关闭）。
+- **[移动端响应式复查]** `Team/TeamManager.tsx`（roomPanel 三列网格在窄屏堆叠）、`UIPrototype/UICanvas.tsx`（顶栏工具挤压）。验收：≤ 400px 宽不横向溢出。
+- **[Settings 增强]** `Settings/Settings.tsx`：API Key 显示/隐藏切换（眼睛图标）；“测试连接”按钮（调 `utils/aiService.ts` 发一条最小请求，用 toast 反馈）。
+
+### P2 — 功能增量
+- **[项目导入/导出]** `Dashboard.tsx` + `utils/storage.ts`：单项目导出为 `.json`（meta+content），导入时新建项目并深拷贝。复用 `confirmDialog`/`toast`。
+- **[白板多选与对齐]** `Board.tsx`：框选、批量移动/删除、基础对齐吸附。风险中，注意 `onDataChange` 回传结构不变。
+- **[命令面板 / 快捷键帮助]** 新增 `components/CommandPalette.tsx`：`Ctrl/Cmd+K` 打开，列出模块跳转与常用动作；再加一个 `?` 快捷键帮助浮层。
+- **[浅色主题]** 令牌已就绪：在 `index.css` 增加 `:root.light { --bg…}` 覆盖，`App`/`Settings` 加主题切换并存 localStorage；`html` 上切 `light`/`dark` 类。
+
+### P3 — 工程化
+- **[协作健壮性（需联机测试）]** `utils/collaboration.ts`：早期 `close`/断线时 reject 挂起的 connect Promise；断线自动重连（带退避）。**务必在真实联机环境验证**。
+- **[i18n]** 抽离中文文案到字典，为将来多语言铺路。
+- **[质量门禁]** 引入 `tsc --noEmit` + `eslint` 到提交前脚本；补关键工具函数（storage、collaboration.normalizeRoomServerUrl）单测。
+
+---
+
+## 5. 开发与验证命令（本地可跑，云端沙箱跑不了依赖）
+
+```bash
+npm install            # 首次
+npm run dev            # 本地开发预览（Vite）
+npm run build          # tsc 类型检查 + vite 打包 —— 每轮迭代后必跑
+npm run lint           # ESLint
+npm run electron:build # 打 Windows 安装包（可选）
+```
+
+**每轮迭代的收尾清单**：`npm run build` 通过 → 手动点一遍受影响的交互（尤其删除类流程）→ 提交。
+
+---
+
+## 6. 风险与注意事项
+
+- **删除流程已改为异步**：`Dashboard/Settings/Team/Docs/UIPrototype` 的删除从同步 `confirm()` 改成 `await confirmDialog()`。逻辑已保留、删除前捕获了目标 id，但请各点一遍确认无回归。
+- **NoteCard 是浅色的**：别顺手迁成深色令牌（见 2.4）。
+- **协作/Electron 代码未在本轮做无法验证的重构**：只加了防御性 `try/catch`。深层断线/重连问题留待联机环境处理。
+- **字体**：`index.html` 引了 Google Fonts（Inter / Space Grotesk），离线时自动回退系统字体，不影响使用；如需完全离线可改为本地打包字体。
+- **令牌是唯一事实来源**：调色只改 `src/index.css` 的 `:root` 变量，全局生效。

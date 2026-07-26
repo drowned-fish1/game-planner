@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Design tokens — Refined dark "game-dev" theme
+   Values are space-separated RGB triplets so Tailwind can apply
+   opacity via rgb(var(--token) / <alpha-value>).
+   ============================================================ */
+:root {
+  --bg: 12 17 26;            /* app background (deepest)      #0C111A */
+  --surface: 22 28 40;       /* panels / cards                #161C28 */
+  --surface-2: 30 38 52;     /* elevated panels               #1E2634 */
+  --surface-3: 39 48 64;     /* hover / raised                #273040 */
+  --line: 40 49 66;          /* default borders               #283142 */
+  --line-strong: 56 67 88;   /* prominent borders             #384358 */
+  --content: 229 233 242;    /* primary text                  #E5E9F2 */
+  --muted: 154 164 184;      /* secondary text                #9AA4B8 */
+  --subtle: 106 116 136;     /* tertiary text / placeholder   #6A7488 */
+  --brand: 16 185 129;       /* brand accent (emerald)        #10B981 */
+  --brand-fg: 3 18 14;       /* text on bright brand fills            */
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
 html, body, #root {
   height: 100%;
   width: 100%;
@@ -9,6 +33,279 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: rgb(var(--bg));
+    color: rgb(var(--content));
+    font-family: theme('fontFamily.sans');
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Consistent focus ring across the app */
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand) / 0.7);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Text selection */
+  ::selection {
+    background: rgb(var(--brand) / 0.30);
+    color: rgb(var(--content));
+  }
+
+  /* Placeholders */
+  ::placeholder {
+    color: rgb(var(--subtle));
+  }
+
+  /* Native selects — themed to match inputs */
+  select {
+    color: rgb(var(--content));
+    background-color: rgb(var(--surface-2) / 0.7);
+  }
+  select option {
+    background-color: rgb(var(--surface-2));
+    color: rgb(var(--content));
+  }
+
+  /* Form accents */
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='range'] {
+    accent-color: rgb(var(--brand));
+  }
+
+  /* Keyboard hint */
+  kbd {
+    font-family: theme('fontFamily.mono');
+    font-size: 0.75rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgb(var(--line-strong));
+    background: rgb(var(--surface-2));
+    color: rgb(var(--muted));
+    box-shadow: inset 0 -1px 0 0 rgb(0 0 0 / 0.3);
+  }
+}
+
+/* ============================================================
+   TipTap / prose theming (Docs editor)
+   ============================================================ */
+@layer base {
+  /* Map Tailwind Typography's dark-invert vars to our tokens */
+  .prose-invert {
+    --tw-prose-invert-body: rgb(var(--content));
+    --tw-prose-invert-headings: #ffffff;
+    --tw-prose-invert-lead: rgb(var(--muted));
+    --tw-prose-invert-links: rgb(var(--brand));
+    --tw-prose-invert-bold: #ffffff;
+    --tw-prose-invert-counters: rgb(var(--muted));
+    --tw-prose-invert-bullets: rgb(var(--line-strong));
+    --tw-prose-invert-hr: rgb(var(--line));
+    --tw-prose-invert-quotes: rgb(var(--muted));
+    --tw-prose-invert-quote-borders: rgb(var(--brand) / 0.5);
+    --tw-prose-invert-captions: rgb(var(--subtle));
+    --tw-prose-invert-code: rgb(var(--brand) / 0.95);
+    --tw-prose-invert-pre-code: rgb(var(--content));
+    --tw-prose-invert-pre-bg: rgb(var(--bg));
+    --tw-prose-invert-th-borders: rgb(var(--line-strong));
+    --tw-prose-invert-td-borders: rgb(var(--line));
+  }
+
+  /* Inline code chip */
+  .prose-invert :where(code):not(:where(pre code)) {
+    background: rgb(var(--brand) / 0.10);
+    border: 1px solid rgb(var(--brand) / 0.20);
+    border-radius: 0.35rem;
+    padding: 0.1rem 0.35rem;
+    font-weight: 500;
+  }
+  .prose-invert :where(code):not(:where(pre code))::before,
+  .prose-invert :where(code):not(:where(pre code))::after {
+    content: '';
+  }
+
+  /* Code blocks */
+  .prose-invert :where(pre) {
+    border: 1px solid rgb(var(--line));
+    border-radius: 0.75rem;
+  }
+
+  /* Blockquotes */
+  .prose-invert :where(blockquote) {
+    border-inline-start-width: 3px;
+    background: rgb(var(--surface) / 0.5);
+    border-radius: 0 0.5rem 0.5rem 0;
+    padding: 0.25rem 1rem;
+    font-style: normal;
+  }
+
+  /* Links */
+  .prose-invert :where(a):hover {
+    text-decoration-color: rgb(var(--brand) / 0.6);
+  }
+
+  /* ProseMirror editor placeholder + focus */
+  .ProseMirror:focus { outline: none; }
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: rgb(var(--subtle));
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+}
+
+/* ============================================================
+   Scrollbars — slim, dark, self-effacing
+   ============================================================ */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line-strong) / 0.7);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--subtle) / 0.8);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* ============================================================
+   Component primitives
+   ============================================================ */
+@layer components {
+  /* --- Buttons --- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2
+           text-sm font-medium leading-none transition-all duration-150
+           select-none disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn text-white shadow-card;
+    background: linear-gradient(180deg, rgb(var(--brand) / 1), rgb(var(--brand) / 0.86));
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 0 1px rgb(var(--brand) / 0.4), 0 8px 24px -8px rgb(var(--brand) / 0.55);
+    filter: brightness(1.06);
+  }
+  .btn-primary:active { filter: brightness(0.96); transform: translateY(0.5px); }
+
+  .btn-outline {
+    @apply btn border border-line-strong bg-surface-2/60 text-content
+           hover:bg-surface-3 hover:border-subtle/50;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-surface-3 hover:text-content;
+  }
+  .btn-danger {
+    @apply btn bg-red-500/90 text-white hover:bg-red-500;
+  }
+
+  /* --- Surfaces --- */
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+  .panel {
+    @apply rounded-xl border border-line bg-surface-2/70 backdrop-blur-sm;
+  }
+  .glass {
+    @apply border border-white/5 bg-surface/70 backdrop-blur-xl;
+  }
+
+  /* --- Inputs --- */
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface-2/70 px-3 py-2 text-sm
+           text-content placeholder:text-subtle transition-colors
+           focus:border-brand/60 focus:bg-surface-2 focus:outline-none;
+  }
+
+  /* --- Chips / badges --- */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line
+           bg-surface-2/70 px-2.5 py-1 text-xs font-medium text-muted;
+  }
+
+  /* --- Nav item (sidebar) --- */
+  .nav-item {
+    @apply relative flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5
+           text-left text-sm font-medium text-muted transition-all duration-150
+           hover:bg-surface-3 hover:text-content;
+  }
+  .nav-item-active {
+    @apply text-white;
+    background: linear-gradient(180deg, rgb(var(--brand) / 0.20), rgb(var(--brand) / 0.10));
+    box-shadow: inset 0 0 0 1px rgb(var(--brand) / 0.28);
+  }
+
+  /* --- Toast --- */
+  .toast {
+    @apply pointer-events-auto flex items-center gap-3 rounded-xl border border-line
+           bg-surface-2/95 px-4 py-3 text-sm text-content shadow-elevated backdrop-blur-xl;
+  }
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .text-gradient-brand {
+    background: linear-gradient(120deg, #6ee7b7, #10b981 55%, #34d399);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* Respect the user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Toast entrance animation */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-in { animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ============================================================
+   Third-party / feature styles (preserved)
+   ============================================================ */
 /* 磁贴调整大小手柄样式 */
 .react-resizable {
   position: relative;
@@ -36,6 +333,6 @@ html, body, #root {
   bottom: 4px;
   width: 8px;
   height: 8px;
-  border-right: 2px solid rgba(255,255,255,0.5);
-  border-bottom: 2px solid rgba(255,255,255,0.5);
+  border-right: 2px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.5);
 }

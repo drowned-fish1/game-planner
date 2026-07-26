@@ -74,8 +74,8 @@ export function UIComponentWrapper({
 
   const toggleClass = (component.interaction?.type === 'toggle' && !toggleState) ? 'brightness-50' : '';
   let borderClass = '';
-  if (isMoving) borderClass = 'ring-2 ring-emerald-400 ring-dashed cursor-move z-[999]';
-  else if (isSelected) borderClass = 'ring-2 ring-purple-500 cursor-pointer';
+  if (isMoving) borderClass = 'ring-2 ring-brand-400 ring-dashed cursor-move z-[999]';
+  else if (isSelected) borderClass = 'ring-2 ring-iris-500 cursor-pointer';
   else borderClass = component.interaction?.type !== 'none' ? 'hover:ring-1 hover:ring-white/50 cursor-pointer' : '';
 
   const opacity = component.state?.isDisabled ? 0.5 : 1;
@@ -97,7 +97,7 @@ export function UIComponentWrapper({
         className={`absolute group transition-all active:scale-95 ${borderClass} ${toggleClass}`}
         style={{ width: displayW, height: displayH, zIndex: isMoving ? 9999 : (component.zIndex || 1), opacity: opacity, display: displayStyle }}
       >
-        {isMoving && <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"><Move size={24} className="text-emerald-400 drop-shadow-md animate-pulse" /></div>}
+        {isMoving && <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"><Move size={24} className="text-brand-400 drop-shadow-md animate-pulse" /></div>}
 
         {/* 使用传入的 assetConfig 渲染 */}
         {assetConfig ? (
@@ -121,7 +121,7 @@ export function UIComponentWrapper({
         )}
 
         {!isMoving && component.interaction?.type !== 'none' && (
-           <div className="absolute -top-2 -right-2 bg-slate-700 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm z-[200] pointer-events-none border border-slate-500">
+           <div className="absolute -top-2 -right-2 bg-surface-3 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm z-[200] pointer-events-none border border-line-strong">
              {component.interaction?.type}
            </div>
         )}

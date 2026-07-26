@@ -1,5 +1,5 @@
 // src/components/UIPrototype/UIManager.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { UIPage, PageType, CustomAsset } from '../../utils/storage';
 import { Plus, Layout, Trash2, Play, Monitor, Smartphone, Tablet, Sidebar, CreditCard, Square } from 'lucide-react';
@@ -7,6 +7,7 @@ import { UICanvas } from './UICanvas';
 import { AssetEditorModal } from './AssetEditorModal';
 import { UI_ASSETS as DEFAULT_ASSETS } from './assets';
 import { PixelSprite } from './PixelSprite';
+import { confirmDialog } from '../../utils/confirm';
 
 interface UIManagerProps {
   data: { pages: UIPage[]; startPageId?: string; assets?: CustomAsset[] }; 
@@ -30,6 +31,14 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
   const [showAssetModal, setShowAssetModal] = useState(false); // 资产弹窗开关
 
   const [globalVars, setGlobalVars] = useState<Record<string, number>>({ HP: 100, GOLD: 0, KEY: 0 });
+
+  // Esc 关闭新建页面弹窗
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowCreateModal(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showCreateModal]);
 
   // === 资产合并逻辑 ===
   // 将内置 assets 和用户自定义 assets 合并显示
@@ -61,8 +70,10 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
     setShowAssetModal(false);
   };
 
-  const deletePage = (e: React.MouseEvent, id: string) => { 
-      e.stopPropagation(); if (!confirm('确定删除这个页面吗？')) return;
+  const deletePage = async (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      const ok = await confirmDialog({ title: '确定删除这个页面吗？', confirmText: '删除', danger: true });
+      if (!ok) return;
       onUpdate({ ...data, pages: data.pages.filter(p => p.id !== id) });
   };
   const setStartPage = (e: React.MouseEvent, id: string) => { 
@@ -77,25 +88,25 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
     return (
       <div className="flex h-full w-full bg-[#121212] overflow-hidden">
          {/* === 1. 左侧资产栏 (新位置) === */}
-         <div className="w-64 bg-slate-900 border-r border-slate-700 p-4 flex flex-col gap-4 select-none shrink-0 z-10 h-full">
+         <div className="w-64 bg-bg border-r border-line p-4 flex flex-col gap-4 select-none shrink-0 z-10 h-full">
             <div className="flex justify-between items-center mb-1">
-                <h3 className="text-slate-400 text-xs font-bold uppercase">UI 资产库</h3>
-                <button onClick={() => setShowAssetModal(true)} className="p-1.5 hover:bg-slate-700 rounded text-emerald-500 hover:text-emerald-400 transition-colors" title="新建资产"><Plus size={16}/></button>
+                <h3 className="text-muted text-xs font-bold uppercase">UI 资产库</h3>
+                <button onClick={() => setShowAssetModal(true)} className="p-1.5 hover:bg-surface-3 rounded text-brand-500 hover:text-brand-400 transition-colors" title="新建资产"><Plus size={16}/></button>
             </div>
             
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-2 gap-3 pb-4">
                 {allAssets.map(asset => (
                   <div key={asset.id} 
-                       className="flex flex-col items-center gap-2 p-2 bg-slate-800 rounded border border-slate-700 hover:border-emerald-500 cursor-grab active:cursor-grabbing transition-all group" 
+                       className="flex flex-col items-center gap-2 p-2 bg-surface rounded border border-line hover:border-brand-500 cursor-grab active:cursor-grabbing transition-all group" 
                        draggable 
                        // 拖拽数据结构要匹配 UICanvas 的 handleDrop
                        onDragStart={(e) => { e.dataTransfer.setData('uicomponent', JSON.stringify({ type: 'sprite', ...asset })); }}
                   >
-                    <div className="w-full h-16 flex items-center justify-center overflow-hidden bg-slate-900/50 rounded">
+                    <div className="w-full h-16 flex items-center justify-center overflow-hidden bg-bg/50 rounded">
                         <PixelSprite config={asset} scale={1} className="max-w-full max-h-full object-contain" />
                     </div>
-                    <span className="text-[10px] text-slate-500 group-hover:text-slate-300 text-center break-all leading-tight w-full truncate">{asset.label}</span>
+                    <span className="text-[10px] text-subtle group-hover:text-content text-center break-all leading-tight w-full truncate">{asset.label}</span>
                   </div>
                 ))}
               </div>
@@ -130,35 +141,53 @@ export function UIManager({ data, onUpdate }: UIManagerProps) {
 
   // === 仪表盘模式 (保持不变) ===
   return (
-    <div className="flex-1 bg-slate-900 p-8 overflow-y-auto h-full relative">
+    <div className="flex-1 bg-bg p-8 overflow-y-auto h-full relative">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold text-white flex items-center gap-3"><Monitor size={32} className="text-purple-500" /> UI 原型机 Pro</h2>
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl border border-iris-500/30 bg-iris-500/10 text-iris-400"><Monitor size={24} /></div>
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-white">UI 原型机 <span className="text-iris-400">Pro</span></h2>
+            <p className="mt-0.5 text-sm text-muted">共 {data.pages.length} 个界面</p>
+          </div>
+        </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-        <button onClick={() => setShowCreateModal(true)} className="aspect-video bg-slate-800/50 border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center group"><Plus size={32} className="text-slate-500 group-hover:text-white"/><span className="text-slate-500 mt-2">新建页面</span></button>
+        <button onClick={() => setShowCreateModal(true)} className="aspect-video bg-surface/50 border-2 border-dashed border-line hover:border-brand-500 rounded-xl flex flex-col items-center justify-center group"><Plus size={32} className="text-subtle group-hover:text-white"/><span className="text-subtle mt-2">新建页面</span></button>
         {data.pages.map(page => (
-            <div key={page.id} onClick={() => setEditingPageId(page.id)} className={`aspect-video bg-slate-800 border-2 rounded-xl relative group cursor-pointer hover:-translate-y-1 transition-all ${data.startPageId === page.id ? 'border-purple-500' : 'border-slate-700'}`}>
-                <div className="w-full h-full flex flex-col items-center justify-center text-white font-bold bg-slate-900/50">
+            <div key={page.id} onClick={() => setEditingPageId(page.id)} className={`aspect-video bg-surface border-2 rounded-xl relative group cursor-pointer hover:-translate-y-1 transition-all ${data.startPageId === page.id ? 'border-iris-500' : 'border-line'}`}>
+                <div className="w-full h-full flex flex-col items-center justify-center text-white font-bold bg-bg/50">
                     {page.name}
-                    <span className="text-[10px] text-slate-500 font-normal uppercase mt-1">{page.type}</span>
+                    <span className="text-[10px] text-subtle font-normal uppercase mt-1">{page.type}</span>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => setStartPage(e, page.id)} className="p-1.5 bg-slate-600 rounded text-white hover:bg-purple-600"><Play size={14}/></button>
-                    <button onClick={(e) => deletePage(e, page.id)} className="p-1.5 bg-slate-600 rounded text-white hover:bg-red-600"><Trash2 size={14}/></button>
+                    <button onClick={(e) => setStartPage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-iris-600"><Play size={14}/></button>
+                    <button onClick={(e) => deletePage(e, page.id)} className="p-1.5 bg-surface-3 rounded text-white hover:bg-red-600"><Trash2 size={14}/></button>
                 </div>
-                {data.startPageId === page.id && <div className="absolute top-2 left-2 bg-purple-600 text-[10px] px-2 rounded font-bold">HOME</div>}
+                {data.startPageId === page.id && <div className="absolute top-2 left-2 bg-iris-600 text-[10px] px-2 rounded font-bold">HOME</div>}
             </div>
         ))}
       </div>
+
+      {/* 首次使用空状态 */}
+      {data.pages.length === 0 && (
+        <div className="mt-14 flex flex-col items-center gap-3 text-center animate-fade-in-up">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl border border-line bg-surface-2/60 text-subtle"><Layout size={30} /></div>
+          <h3 className="text-lg font-semibold text-content">还没有界面原型</h3>
+          <p className="max-w-sm text-sm leading-relaxed text-muted">
+            点击「新建页面」，从 PC、手机、弹窗等模板快速搭建你的第一个 UI 草图。
+          </p>
+        </div>
+      )}
+
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm" onClick={() => setShowCreateModal(false)}>
-            <div className="bg-slate-800 p-6 rounded-xl w-[800px] border border-slate-700 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm p-4" onClick={() => setShowCreateModal(false)}>
+            <div className="bg-surface p-6 rounded-2xl w-full max-w-[800px] border border-line shadow-elevated animate-scale-in" onClick={e => e.stopPropagation()}>
                 <h3 className="text-white font-bold mb-4 text-xl">选择界面模板</h3>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {PAGE_PRESETS.map((p, i) => (
-                        <div key={i} onClick={() => createPage(p)} className="bg-slate-700/50 p-4 rounded-lg cursor-pointer hover:bg-emerald-600/20 hover:border-emerald-500 border border-slate-600 text-center flex flex-col items-center justify-center h-32 group transition-all">
-                            <p className="text-slate-300 group-hover:text-white font-bold mb-1">{p.label}</p>
-                            <span className="text-[10px] text-slate-500">{p.w}x{p.h}</span>
+                        <div key={i} onClick={() => createPage(p)} className="bg-surface-3/50 p-4 rounded-lg cursor-pointer hover:bg-brand-600/20 hover:border-brand-500 border border-line-strong text-center flex flex-col items-center justify-center h-32 group transition-all">
+                            <p className="text-content group-hover:text-white font-bold mb-1">{p.label}</p>
+                            <span className="text-[10px] text-subtle">{p.w}x{p.h}</span>
                         </div>
                     ))}
                 </div>

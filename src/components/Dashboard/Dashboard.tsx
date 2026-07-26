@@ -1,24 +1,60 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  Plus,
+  Search,
+  Gamepad2,
+  Image as ImageIcon,
+  Trash2,
+  Clock,
+  MoreVertical,
+  ArrowUpDown,
+  Copy,
+} from 'lucide-react';
 // 只引用 getProjectsList 和 saveProjectsList，不再引用 getWorkspaceData
-import { getProjectsList, saveProjectsList, ProjectMeta } from '../../utils/storage';
+import { getProjectsList, saveProjectsList, loadProjectContent, saveProjectContent, ProjectMeta } from '../../utils/storage';
+import { toast } from '../../utils/toast';
+import { confirmDialog } from '../../utils/confirm';
 
 interface DashboardProps {
   onOpenProject: (project: ProjectMeta) => void;
 }
 
+type SortMode = 'recent' | 'name';
+
+function relativeTime(ts?: number): string {
+  if (!ts) return '尚未编辑';
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} 天前`;
+  const date = new Date(ts);
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export function Dashboard({ onOpenProject }: DashboardProps) {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
+  const [query, setQuery] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>(
+    () => ((localStorage.getItem('gp_dash_sort') as SortMode) || 'recent'),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // 右键菜单状态
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, targetId: string }>({ 
-    visible: false, x: 0, y: 0, targetId: '' 
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; targetId: string }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    targetId: '',
   });
 
   useEffect(() => {
     setProjects(getProjectsList());
-    const handleClickOutside = () => setContextMenu({ ...contextMenu, visible: false });
+    const handleClickOutside = () => setContextMenu((prev) => ({ ...prev, visible: false }));
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
@@ -34,12 +70,59 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
     const newList = [newProject, ...projects];
     setProjects(newList);
     saveProjectsList(newList);
+    toast.success('已创建新项目');
+  };
+
+  // 记住排序偏好
+  useEffect(() => {
+    localStorage.setItem('gp_dash_sort', sortMode);
+  }, [sortMode]);
+
+  // 快捷键：Ctrl/Cmd + N 新建项目
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        createProject();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [projects]);
+
+  // 创建副本
+  const duplicateProject = () => {
+    const source = projects.find((p) => p.id === contextMenu.targetId);
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    if (!source) return;
+    const newId = uuidv4();
+    const cloned = JSON.parse(JSON.stringify(loadProjectContent(source.id)));
+    const newMeta: ProjectMeta = {
+      id: newId,
+      name: `${source.name} 副本`,
+      cover: source.cover,
+      lastModified: Date.now(),
+    };
+    const newList = [newMeta, ...projects];
+    setProjects(newList);
+    saveProjectsList(newList); // 先写入列表，saveProjectContent 才能更新其修改时间
+    saveProjectContent(newId, cloned);
+    toast.success('已创建副本');
   };
 
   // 右键逻辑
+  const openMenuAt = (x: number, y: number, id: string) => {
+    // clamp so the menu stays on-screen
+    const menuW = 160;
+    const menuH = 132;
+    const clampedX = Math.min(x, window.innerWidth - menuW - 8);
+    const clampedY = Math.min(y, window.innerHeight - menuH - 8);
+    setContextMenu({ visible: true, x: clampedX, y: clampedY, targetId: id });
+  };
+
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetId: id });
+    openMenuAt(e.clientX, e.clientY, id);
   };
 
   // 封面上传
@@ -48,7 +131,9 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
     if (file && contextMenu.targetId) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        const newList = projects.map(p => p.id === contextMenu.targetId ? { ...p, cover: ev.target?.result as string } : p);
+        const newList = projects.map((p) =>
+          p.id === contextMenu.targetId ? { ...p, cover: ev.target?.result as string } : p,
+        );
         setProjects(newList);
         saveProjectsList(newList);
       };
@@ -59,62 +144,209 @@ export function Dashboard({ onOpenProject }: DashboardProps) {
 
   // 改名
   const updateName = (id: string, name: string) => {
-    const newList = projects.map(p => p.id === id ? { ...p, name } : p);
+    const newList = projects.map((p) => (p.id === id ? { ...p, name } : p));
     setProjects(newList);
     saveProjectsList(newList);
   };
 
   // 删除
-  const deleteProject = () => {
-    if (confirm("确定删除项目？")) {
-      const newList = projects.filter(p => p.id !== contextMenu.targetId);
+  const deleteProject = async () => {
+    const target = projects.find((p) => p.id === contextMenu.targetId);
+    const targetId = contextMenu.targetId;
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    const ok = await confirmDialog({
+      title: '确定删除项目？',
+      message: target ? `“${target.name}” 及其所有内容将被永久删除，此操作无法撤销。` : '此操作无法撤销。',
+      confirmText: '删除',
+      danger: true,
+    });
+    if (ok) {
+      const newList = projects.filter((p) => p.id !== targetId);
       setProjects(newList);
       saveProjectsList(newList);
+      toast.success('已删除项目');
     }
   };
 
-  return (
-    <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-200 p-10 overflow-hidden relative">
-      <input type="file" ref={fileInputRef} onChange={handleCoverUpload} className="hidden" accept="image/*"/>
+  const visibleProjects = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects.slice();
+    filtered.sort((a, b) => {
+      if (sortMode === 'name') return a.name.localeCompare(b.name, 'zh-Hans-CN');
+      return (b.lastModified || 0) - (a.lastModified || 0);
+    });
+    return filtered;
+  }, [projects, query, sortMode]);
 
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold text-white mb-2">Game Planner <span className="text-emerald-500 text-sm align-top">Pro</span></h1>
-        <p className="text-slate-400">项目管理大厅</p>
+  return (
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-bg text-content">
+      {/* Ambient background flourish */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-brand-500/10 blur-3xl" />
+        <div className="absolute -right-32 top-20 h-80 w-80 rounded-full bg-iris-500/10 blur-3xl" />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 content-start pb-20">
-          <div onClick={createProject} className="aspect-[4/3] rounded-xl border-2 border-dashed border-slate-700 hover:border-emerald-500 hover:bg-slate-800/50 flex flex-col items-center justify-center cursor-pointer transition-all group">
-            <div className="text-4xl text-slate-600 group-hover:text-emerald-500 mb-2 transition-colors">+</div>
-            <span className="text-slate-500 font-medium">创建新项目</span>
+      <input type="file" ref={fileInputRef} onChange={handleCoverUpload} className="hidden" accept="image/*" />
+
+      {/* Header */}
+      <header className="relative z-10 shrink-0 px-6 pt-8 md:px-10 md:pt-10">
+        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl border border-brand-500/30 bg-brand-500/10 text-brand-400 shadow-glow">
+              <Gamepad2 size={24} />
+            </div>
+            <div>
+              <h1 className="font-display text-3xl font-bold tracking-tight text-white md:text-4xl">
+                Game Planner <span className="text-gradient-brand">Pro</span>
+              </h1>
+              <p className="mt-0.5 text-sm text-muted">项目管理大厅 · 共 {projects.length} 个项目</p>
+            </div>
           </div>
 
-          {projects.map(project => (
-            <div 
-              key={project.id} 
+          {/* Search + sort */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="搜索项目…"
+                className="input w-52 pl-9"
+              />
+            </div>
+            <button
+              onClick={() => setSortMode((m) => (m === 'recent' ? 'name' : 'recent'))}
+              title="切换排序方式"
+              className="btn-outline whitespace-nowrap"
+            >
+              <ArrowUpDown size={15} />
+              {sortMode === 'recent' ? '最近编辑' : '名称'}
+            </button>
+          </div>
+        </div>
+        <div className="mt-6 h-px bg-gradient-to-r from-line via-line/50 to-transparent" />
+      </header>
+
+      {/* Grid */}
+      <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-24 pt-6 md:px-10">
+        <div className="grid grid-cols-2 content-start gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {/* Create card */}
+          <button
+            onClick={createProject}
+            className="group flex aspect-[4/3] flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-line-strong/70 bg-surface/40 transition-all hover:border-brand-500/70 hover:bg-surface-2/60"
+          >
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-surface-3 text-subtle transition-all group-hover:scale-110 group-hover:bg-brand-500/15 group-hover:text-brand-400">
+              <Plus size={22} />
+            </div>
+            <span className="text-sm font-medium text-muted group-hover:text-content">创建新项目</span>
+          </button>
+
+          {/* Project cards */}
+          {visibleProjects.map((project) => (
+            <div
+              key={project.id}
               onClick={() => onOpenProject(project)}
               onContextMenu={(e) => handleContextMenu(e, project.id)}
-              className="group relative aspect-[4/3] bg-slate-800 rounded-xl border border-slate-700 hover:border-emerald-500 hover:shadow-xl transition-all cursor-pointer flex flex-col overflow-hidden"
+              className="group relative flex aspect-[4/3] cursor-pointer animate-fade-in-up flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-500/50 hover:shadow-elevated"
             >
-              <div className="flex-1 bg-slate-900 relative pointer-events-none">
-                 {project.cover ? <img src={project.cover} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-700 text-4xl">🎮</div>}
+              {/* Cover */}
+              <div className="relative flex-1 overflow-hidden bg-gradient-to-br from-surface-2 to-bg">
+                {project.cover ? (
+                  <img
+                    src={project.cover}
+                    className="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    alt=""
+                  />
+                ) : (
+                  <div className="pointer-events-none flex h-full w-full items-center justify-center">
+                    <Gamepad2 size={40} className="text-line-strong" />
+                  </div>
+                )}
+                {/* hover overlay */}
+                <div className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
+                {/* kebab menu button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    openMenuAt(rect.right, rect.bottom, project.id);
+                  }}
+                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg bg-black/40 text-white/80 opacity-0 backdrop-blur-sm transition-all hover:bg-black/60 hover:text-white group-hover:opacity-100"
+                >
+                  <MoreVertical size={15} />
+                </button>
               </div>
-              <div className="h-12 bg-slate-800 border-t border-slate-700 flex items-center px-2" onClick={e => e.stopPropagation()}>
-                 <input 
-                   value={project.name} 
-                   onChange={e => updateName(project.id, e.target.value)} 
-                   className="bg-transparent font-bold text-slate-200 w-full text-center outline-none focus:bg-slate-900 rounded px-1"
-                 />
+
+              {/* Meta */}
+              <div className="flex items-center gap-2 border-t border-line bg-surface px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                <div className="min-w-0 flex-1">
+                  <input
+                    value={project.name}
+                    onChange={(e) => updateName(project.id, e.target.value)}
+                    className="w-full truncate rounded bg-transparent text-sm font-semibold text-content outline-none focus:bg-surface-2 focus:px-1"
+                  />
+                  <div className="mt-0.5 flex items-center gap-1 text-[11px] text-subtle">
+                    <Clock size={11} />
+                    {relativeTime(project.lastModified)}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
         </div>
+
+        {/* First-run empty state */}
+        {projects.length === 0 && (
+          <div className="mt-14 flex flex-col items-center gap-3 text-center animate-fade-in-up">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl border border-line bg-surface-2/60 text-subtle">
+              <Gamepad2 size={30} />
+            </div>
+            <h2 className="text-lg font-semibold text-content">开始你的第一个游戏项目</h2>
+            <p className="max-w-sm text-sm leading-relaxed text-muted">
+              点击上方「创建新项目」，或按 <kbd>Ctrl</kbd> + <kbd>N</kbd> 快速新建。
+              灵感白板、策划文档、UI 原型，都从这里开始。
+            </p>
+          </div>
+        )}
+
+        {/* Empty state (no matches) */}
+        {visibleProjects.length === 0 && query.trim() && (
+          <div className="mt-16 flex flex-col items-center gap-2 text-center text-muted">
+            <Search size={28} className="text-line-strong" />
+            <p className="text-sm">没有找到匹配 “{query}” 的项目</p>
+          </div>
+        )}
       </div>
 
+      {/* Context menu */}
       {contextMenu.visible && (
-        <div className="fixed z-[9999] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 w-32 flex flex-col" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={e => e.stopPropagation()}>
-           <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 text-left text-sm text-slate-200 hover:bg-emerald-600">🖼️ 换封面</button>
-           <button onClick={deleteProject} className="px-4 py-2 text-left text-sm text-red-400 hover:bg-red-600 hover:text-white">🗑️ 删除</button>
+        <div
+          className="glass fixed z-[9999] w-40 animate-scale-in rounded-xl py-1 shadow-elevated"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-content transition-colors hover:bg-surface-3"
+          >
+            <ImageIcon size={15} className="text-muted" />
+            更换封面
+          </button>
+          <button
+            onClick={duplicateProject}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-content transition-colors hover:bg-surface-3"
+          >
+            <Copy size={15} className="text-muted" />
+            创建副本
+          </button>
+          <button
+            onClick={deleteProject}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
+          >
+            <Trash2 size={15} />
+            删除项目
+          </button>
         </div>
       )}
     </div>

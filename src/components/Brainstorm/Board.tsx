@@ -18,7 +18,7 @@ import {
   Type,
   X,
 } from 'lucide-react';
-import { NoteCard } from './NoteCard';
+import { NoteCard, type ConnectorHandle } from './NoteCard';
 import type { RoomParticipant } from '../../utils/collaboration';
 
 interface BoardItem {
@@ -35,6 +35,8 @@ interface Connection {
   id: string;
   start: string;
   end: string;
+  startHandle?: ConnectorHandle;
+  endHandle?: ConnectorHandle;
 }
 
 interface BrainstormBoardProps {
@@ -52,6 +54,11 @@ type TransformState = {
   scale: number;
   positionX: number;
   positionY: number;
+};
+
+type PendingConnection = {
+  itemId: string;
+  handle: ConnectorHandle;
 };
 
 function getItemDefaults(type: BoardItem['type']) {
@@ -89,12 +96,16 @@ export function BrainstormBoard({
   const [connections, setConnections] = useState<Connection[]>(initialConnections);
   const [mode, setMode] = useState<'pan' | 'edit' | 'connect'>('pan');
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
+  const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 768));
+  const [isMiddlePanning, setIsMiddlePanning] = useState(false);
 
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
+  const middlePanRef = useRef<{ startX: number; startY: number; originX: number; originY: number; active: boolean } | null>(null);
 
   const updateXarrow = useXarrow();
 
@@ -109,6 +120,29 @@ export function BrainstormBoard({
   useEffect(() => {
     onDataChange?.(items, connections);
   }, [items, connections, onDataChange]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewportMode = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+
+    updateViewportMode();
+    window.addEventListener('resize', updateViewportMode);
+    return () => window.removeEventListener('resize', updateViewportMode);
+  }, []);
+
+  useEffect(() => {
+    if (isDesktop) {
+      setConnectSourceId(null);
+      setMode('edit');
+    } else {
+      setPendingConnection(null);
+      setIsMiddlePanning(false);
+      middlePanRef.current = null;
+    }
+  }, [isDesktop]);
 
   const syncXarrowTransformVars = useCallback((state?: TransformState) => {
     const captureEl = captureRef.current;
@@ -143,6 +177,111 @@ export function BrainstormBoard({
     return { x: centerX - 100, y: centerY - 60 };
   };
 
+  const createConnection = useCallback((start: PendingConnection, end: PendingConnection) => {
+    if (start.itemId === end.itemId) return;
+
+    const exists = connections.some((connection) => (
+      connection.start === start.itemId
+      && connection.end === end.itemId
+      && connection.startHandle === start.handle
+      && connection.endHandle === end.handle
+    ));
+
+    if (exists) return;
+
+    setConnections((prev) => [...prev, {
+      id: uuidv4(),
+      start: start.itemId,
+      end: end.itemId,
+      startHandle: start.handle,
+      endHandle: end.handle,
+    }]);
+
+    onActivity?.({
+      kind: 'brainstorm:connect',
+      itemId: end.itemId,
+      focusedItemId: end.itemId,
+      message: '杩炴帴浜嗕袱寮犵璐?',
+      status: '姝ｅ湪杩炴帴纾佽创',
+    });
+  }, [connections, onActivity]);
+
+  const handleConnectHandleClick = useCallback((itemId: string, handle: ConnectorHandle) => {
+    if (!isDesktop) return;
+
+    setPendingConnection((current) => {
+      if (!current) {
+        onPresenceChange?.('鍑嗗杩炴帴纾佽创', itemId);
+        return { itemId, handle };
+      }
+
+      if (current.itemId === itemId && current.handle === handle) {
+        onPresenceChange?.('姝ｅ湪缂栬緫鐧芥澘', itemId);
+        return null;
+      }
+
+      createConnection(current, { itemId, handle });
+      onPresenceChange?.('姝ｅ湪缂栬緫鐧芥澘', itemId);
+      return null;
+    });
+  }, [createConnection, isDesktop, onPresenceChange]);
+
+  const handleRootMouseDownCapture = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDesktop || event.button !== 1) return;
+
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest('[data-board-overlay="true"]')) {
+      return;
+    }
+
+    const transformState = transformComponentRef.current?.instance.transformState;
+    if (!transformState) return;
+
+    event.preventDefault();
+    setConnectSourceId(null);
+    setPendingConnection(null);
+    middlePanRef.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: transformState.positionX,
+      originY: transformState.positionY,
+    };
+    setIsMiddlePanning(true);
+    onPresenceChange?.('姝ｅ湪鎷栧姩鐧芥澘', null);
+  }, [isDesktop, onPresenceChange]);
+
+  useEffect(() => {
+    if (!isDesktop || typeof window === 'undefined') return undefined;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const panState = middlePanRef.current;
+      const transformApi = transformComponentRef.current;
+      if (!panState?.active || !transformApi) return;
+
+      const { scale } = transformApi.instance.transformState;
+      const nextX = panState.originX + (event.clientX - panState.startX);
+      const nextY = panState.originY + (event.clientY - panState.startY);
+      transformApi.setTransform(nextX, nextY, scale, 0);
+      syncXarrowTransformVars({ scale, positionX: nextX, positionY: nextY });
+      updateXarrow();
+    };
+
+    const handleMouseUp = () => {
+      if (!middlePanRef.current?.active) return;
+      middlePanRef.current = null;
+      setIsMiddlePanning(false);
+      onPresenceChange?.('姝ｅ湪娴忚鐧芥澘', null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDesktop, onPresenceChange, syncXarrowTransformVars, updateXarrow]);
+
   const addItem = (type: BoardItem['type'], defaultContent = '') => {
     const { x, y } = getCenterCoords();
     const size = getItemDefaults(type);
@@ -162,7 +301,7 @@ export function BrainstormBoard({
       onPresenceChange?.('正在查看磁贴', id);
     }
 
-    if (mode !== 'connect') return;
+    if (isDesktop || mode !== 'connect') return;
 
     event.stopPropagation();
 
@@ -315,6 +454,7 @@ export function BrainstormBoard({
   };
 
   const enterConnectMode = () => {
+    if (isDesktop) return;
     setConnectSourceId(null);
     setMode('connect');
     setIsMenuOpen(false);
@@ -322,12 +462,18 @@ export function BrainstormBoard({
   };
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-slate-900 select-none">
+    <div
+      className="absolute inset-0 overflow-hidden bg-bg select-none"
+      onMouseDownCapture={handleRootMouseDownCapture}
+      onAuxClick={(event) => {
+        if (event.button === 1) event.preventDefault();
+      }}
+    >
       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*,audio/*" />
 
-      {mode === 'connect' && (
-        <div className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-3 rounded-full bg-emerald-600 px-4 py-2 text-white shadow-lg">
+      {!isDesktop && mode === 'connect' && (
+        <div data-board-overlay="true" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-3 rounded-full bg-brand-600 px-4 py-2 text-white shadow-lg">
             <LinkIcon size={16} />
             <span className="text-sm font-bold">
               {connectSourceId ? '请点击另一张卡片完成连接' : '请点击起点卡片'}
@@ -339,15 +485,38 @@ export function BrainstormBoard({
         </div>
       )}
 
+      {isDesktop && pendingConnection && (
+        <div data-board-overlay="true" className="pointer-events-none absolute left-1/2 top-4 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-full border border-brand-400/60 bg-bg/95 px-4 py-2 text-white shadow-2xl backdrop-blur">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
+            <span className="text-sm font-semibold">{'\u8bf7\u70b9\u51fb\u53e6\u4e00\u4e2a\u8fde\u63a5\u70b9\u5b8c\u6210\u8fde\u7ebf'}</span>
+          </div>
+        </div>
+      )}
+
+      {items.length === 0 && (
+        <div data-board-overlay="true" className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center">
+          <div className="flex max-w-xs flex-col items-center gap-3 text-center animate-fade-in">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-surface/80 text-brand-400 shadow-xl backdrop-blur">
+              <Plus size={28} />
+            </div>
+            <p className="text-sm font-semibold text-content">白板还是空的</p>
+            <p className="text-xs leading-relaxed text-muted">
+              点击右下角 ＋ 添加第一个灵感，也可以直接拖入图片 / 视频 / 音频
+            </p>
+          </div>
+        </div>
+      )}
+
       {isConnected && otherEditors.length > 0 && (
-        <div className="pointer-events-none absolute right-4 top-4 z-[120] max-w-xs space-y-2">
+        <div data-board-overlay="true" className="pointer-events-none absolute right-4 top-4 z-[120] max-w-xs space-y-2">
           {otherEditors.slice(0, 4).map((participant) => (
-            <div key={participant.connectionId} className="rounded-xl border border-slate-700 bg-slate-800/95 px-3 py-2 shadow-xl backdrop-blur">
+            <div key={participant.connectionId} className="rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-xl backdrop-blur">
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
                 <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: participant.color }} />
                 {participant.name}
               </div>
-              <div className="mt-1 text-xs text-slate-300">{participant.presence.status || '正在白板中协作'}</div>
+              <div className="mt-1 text-xs text-content">{participant.presence.status || '正在白板中协作'}</div>
             </div>
           ))}
         </div>
@@ -359,8 +528,12 @@ export function BrainstormBoard({
         minScale={0.1}
         maxScale={5}
         centerOnInit
-        disabled={mode !== 'pan'}
         limitToBounds={false}
+        panning={{
+          disabled: isDesktop ? true : mode !== 'pan',
+          velocityDisabled: true,
+          excluded: ['button', 'textarea', 'input', 'audio', 'video', 'canvas'],
+        }}
         onTransformed={handleTransform}
         onInit={(ref) => {
           syncXarrowTransformVars(ref.state);
@@ -371,7 +544,7 @@ export function BrainstormBoard({
         <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%' }}>
           <div
             ref={captureRef}
-            className="relative h-[4000px] w-[4000px] bg-slate-900"
+            className="relative h-[4000px] w-[4000px] bg-bg"
             style={{
               backgroundImage: 'radial-gradient(#334155 1px, transparent 1px)',
               backgroundSize: '40px 40px',
@@ -383,6 +556,7 @@ export function BrainstormBoard({
             onDragOver={(event) => event.preventDefault()}
             onClick={() => {
               if (mode === 'connect') setConnectSourceId(null);
+              if (isDesktop) setPendingConnection(null);
               if (isConnected) onPresenceChange?.('正在浏览白板', null);
             }}
           >
@@ -392,7 +566,7 @@ export function BrainstormBoard({
                   key={item.id}
                   style={{ position: 'absolute', left: 0, top: 0 }}
                   onClick={(event) => handleItemClick(item.id, event)}
-                  className={mode === 'connect' ? 'cursor-pointer' : ''}
+                  className={!isDesktop && mode === 'connect' ? 'cursor-pointer' : ''}
                 >
                   {getItemWatchers(item.id).length > 0 && (
                     <div className="pointer-events-none absolute -top-10 left-0 z-[120] flex flex-wrap gap-2">
@@ -411,8 +585,11 @@ export function BrainstormBoard({
                   <NoteCard
                     {...item}
                     scale={transformComponentRef.current?.instance.transformState.scale || 1}
-                    disabled={mode === 'pan' || mode === 'connect'}
-                    isSelected={connectSourceId === item.id}
+                    disabled={isDesktop ? false : mode === 'pan' || mode === 'connect'}
+                    isDesktop={isDesktop}
+                    showConnectionHandles={isDesktop ? pendingConnection?.itemId === item.id : true}
+                    activeConnectHandle={pendingConnection?.itemId === item.id ? pendingConnection.handle : null}
+                    isSelected={connectSourceId === item.id || pendingConnection?.itemId === item.id}
                     inputs={item.type === 'ai' ? getAIInputs(item.id) : undefined}
                     onUpdate={(id, text) => {
                       setItems((prev) => prev.map((entry) => (entry.id === id ? { ...entry, content: text } : entry)));
@@ -426,6 +603,7 @@ export function BrainstormBoard({
                     onDelete={(id) => {
                       setItems((prev) => prev.filter((entry) => entry.id !== id));
                       setConnections((prev) => prev.filter((connection) => connection.start !== id && connection.end !== id));
+                      setPendingConnection((current) => (current?.itemId === id ? null : current));
                       onActivity?.({
                         kind: 'brainstorm:delete',
                         itemId: id,
@@ -438,16 +616,15 @@ export function BrainstormBoard({
                       updateXarrow();
                       onPresenceChange?.('正在移动磁贴', id);
                     }}
-                    onConnectStart={() => {}}
-                    onConnectEnd={() => {}}
+                    onConnectHandleClick={handleConnectHandleClick}
                   />
 
-                  {mode === 'connect' && (
+                  {!isDesktop && mode === 'connect' && (
                     <div
                       className={`absolute inset-0 z-50 rounded-lg transition-all duration-300 ${
                         connectSourceId === item.id
-                          ? 'ring-4 ring-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                          : 'hover:bg-emerald-500/10 hover:ring-2 hover:ring-emerald-400'
+                          ? 'ring-4 ring-brand-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                          : 'hover:bg-brand-500/10 hover:ring-2 hover:ring-brand-400'
                       }`}
                     />
                   )}
@@ -459,10 +636,14 @@ export function BrainstormBoard({
                   key={connection.id}
                   start={connection.start}
                   end={connection.end}
-                  color="#10b981"
-                  strokeWidth={3}
-                  headSize={6}
+                  startAnchor={connection.startHandle ?? 'auto'}
+                  endAnchor={connection.endHandle ?? 'auto'}
+                  color="#34d399"
+                  strokeWidth={3.5}
+                  headSize={5}
                   path="smooth"
+                  curveness={0.55}
+                  dashness={{ strokeLen: 10, nonStrokeLen: 6, animation: 0 }}
                   zIndex={10}
                   divContainerStyle={{
                     transform: 'scale(var(--xarrow-inv-scale, 1)) translate(var(--xarrow-inv-tx, 0px), var(--xarrow-inv-ty, 0px))',
@@ -475,7 +656,7 @@ export function BrainstormBoard({
                           event.stopPropagation();
                           deleteConnection(connection.id);
                         }}
-                        className={`pointer-events-auto z-[999] cursor-pointer rounded-full border border-slate-600 bg-slate-800 p-1 text-slate-400 transition-colors hover:border-red-500 hover:bg-red-500 hover:text-white ${mode === 'pan' ? 'hidden' : ''}`}
+                        className={`pointer-events-auto z-[999] cursor-pointer rounded-full border border-brand-400/40 bg-bg/90 p-1.5 text-content shadow-xl backdrop-blur transition-all hover:border-red-500 hover:bg-red-500 hover:text-white ${!isDesktop && mode === 'pan' ? 'hidden' : ''}`}
                         title="删除连线"
                       >
                         <X size={12} />
@@ -489,42 +670,44 @@ export function BrainstormBoard({
         </TransformComponent>
       </TransformWrapper>
 
-      <div className="pointer-events-none absolute bottom-20 right-4 z-[100] flex items-end gap-4 md:bottom-8 md:right-8">
-        <div className="mb-1 flex gap-2 rounded-full border border-slate-700 bg-slate-800/90 px-2 py-1 shadow-xl backdrop-blur pointer-events-auto">
+      <div data-board-overlay="true" className="pointer-events-none absolute bottom-20 right-4 z-[100] flex items-end gap-4 md:bottom-8 md:right-8">
+        {!isDesktop && (
+        <div className="mb-1 flex gap-2 rounded-full border border-line bg-surface/90 px-2 py-1 shadow-xl backdrop-blur pointer-events-auto">
           <button
             onClick={() => {
               setMode('pan');
               setConnectSourceId(null);
               onPresenceChange?.('正在浏览白板', null);
             }}
-            className={`rounded-full p-2 transition-colors ${mode === 'pan' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`rounded-full p-2 transition-colors ${mode === 'pan' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
             title="浏览模式"
           >
             <Move size={20} />
           </button>
-          <div className="h-6 w-px self-center bg-slate-600 opacity-50" />
+          <div className="h-6 w-px self-center bg-surface-3 opacity-50" />
           <button
             onClick={() => {
               setMode('edit');
               setConnectSourceId(null);
               onPresenceChange?.('正在编辑白板', null);
             }}
-            className={`rounded-full p-2 transition-colors ${mode === 'edit' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`rounded-full p-2 transition-colors ${mode === 'edit' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
             title="编辑模式"
           >
             <MousePointer2 size={20} />
           </button>
           <button
             onClick={enterConnectMode}
-            className={`rounded-full p-2 transition-colors ${mode === 'connect' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`rounded-full p-2 transition-colors ${mode === 'connect' ? 'bg-brand-600 text-white' : 'text-muted hover:text-white'}`}
             title="连线模式"
           >
             <LinkIcon size={20} />
           </button>
         </div>
+        )}
 
-        <div className="pointer-events-auto flex flex-col items-end gap-4">
-          <div className={`origin-bottom flex flex-col gap-3 transition-all duration-300 ${isMenuOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-0 opacity-0'}`}>
+        <div className="pointer-events-auto flex flex-col items-end gap-3">
+          <div className={`origin-bottom rounded-2xl border border-line/80 bg-bg/95 p-3 shadow-2xl backdrop-blur flex flex-col gap-3 transition-all duration-300 ${isMenuOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'}`}>
             <div className="flex gap-2">
               <button onClick={exportAsImage} className="rounded-full bg-blue-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-blue-500" title="导出图片">
                 <Image size={18} />
@@ -539,7 +722,7 @@ export function BrainstormBoard({
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => addItem('code')} className="rounded-full bg-slate-700 px-4 py-2 text-white shadow-lg transition-colors hover:bg-slate-600" title="代码">
+              <button onClick={() => addItem('code')} className="rounded-full bg-surface-3 px-4 py-2 text-white shadow-lg transition-colors hover:bg-line-strong" title="代码">
                 <Code size={18} />
               </button>
               <button onClick={() => addItem('link')} className="rounded-full bg-sky-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-sky-500" title="网页">
@@ -547,27 +730,27 @@ export function BrainstormBoard({
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => addItem('status', 'unused')} className="rounded-full bg-purple-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-purple-500" title="状态">
+              <button onClick={() => addItem('status', 'unused')} className="rounded-full bg-iris-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-iris-500" title="状态">
                 <Activity size={18} />
               </button>
               <button onClick={() => addItem('text')} className="rounded-full bg-yellow-500 px-4 py-2 text-white shadow-lg transition-colors hover:bg-yellow-400" title="便签">
                 <Type size={18} />
               </button>
-              <button onClick={() => addItem('ai')} className="rounded-full border border-purple-500 bg-purple-800 px-4 py-2 text-white shadow-lg transition-colors hover:bg-purple-700" title="AI 助手">
+              <button onClick={() => addItem('ai')} className="rounded-full border border-iris-500 bg-iris-700 px-4 py-2 text-white shadow-lg transition-colors hover:bg-iris-700" title="AI 助手">
                 <Bot size={18} />
               </button>
             </div>
           </div>
           <button
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            className={`flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-2xl transition-transform duration-300 hover:bg-emerald-400 md:h-16 md:w-16 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-2xl transition-transform duration-300 hover:bg-brand-400 md:h-16 md:w-16 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}
           >
             <Plus size={32} />
           </button>
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-4 left-4 hidden text-xs text-slate-500 opacity-50 md:block">
+      <div data-board-overlay="true" className="pointer-events-none absolute bottom-4 left-4 hidden text-xs text-muted/80 md:block">
         {mode === 'pan' && '当前: 浏览模式 (拖动画布 / 缩放白板)'}
         {mode === 'edit' && '当前: 编辑模式 (移动卡片 / 调整尺寸)'}
         {mode === 'connect' && '当前: 连线模式 (点击两张卡片建立连接)'}

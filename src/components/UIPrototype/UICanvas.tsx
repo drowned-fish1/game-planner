@@ -183,14 +183,14 @@ export function UICanvas({
       <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
 
       {/* 顶部工具栏 */}
-      <div className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 z-20">
+      <div className="h-14 bg-surface border-b border-line flex items-center justify-between px-4 shrink-0 z-20">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-slate-700 rounded-lg text-slate-300"><ArrowLeft size={20} /></button>
-          <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="bg-transparent text-white font-bold outline-none border-b border-transparent focus:border-purple-500 px-1" />
+          <button onClick={onBack} className="p-2 hover:bg-surface-3 rounded-lg text-content"><ArrowLeft size={20} /></button>
+          <input value={currentPage.name} onChange={(e) => updatePage({ name: e.target.value })} className="bg-transparent text-white font-bold outline-none border-b border-transparent focus:border-iris-500 px-1" />
         </div>
         <div className="flex gap-2">
-           <button onClick={() => addItem('text')} className="p-2 hover:bg-slate-700 rounded text-slate-300" title="文本"><Type size={18}/></button>
-           <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-slate-700 rounded text-slate-300" title="上传"><MoreHorizontal size={18}/></button>
+           <button onClick={() => addItem('text')} className="p-2 hover:bg-surface-3 rounded text-content" title="文本"><Type size={18}/></button>
+           <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-surface-3 rounded text-content" title="上传"><MoreHorizontal size={18}/></button>
            <button onClick={exportAsImage} className="p-2 hover:bg-blue-600 bg-blue-700 rounded text-white" title="导出"><Image size={18}/></button>
         </div>
       </div>
@@ -201,7 +201,7 @@ export function UICanvas({
            <div className="min-w-full min-h-full flex items-center justify-center pointer-events-none">
              <div 
                ref={captureRef}
-               className="shadow-2xl relative border border-slate-800 transition-all shrink-0 pointer-events-auto"
+               className="shadow-2xl relative border border-line transition-all shrink-0 pointer-events-auto"
                style={{ width: currentPage.width, height: currentPage.height, backgroundColor: currentPage.backgroundColor || '#1e1e1e' }}
                onDrop={handleDrop} onDragOver={handleDragOver} onClick={(e) => { e.stopPropagation(); handleBackgroundClick(); }} 
              >
@@ -226,15 +226,15 @@ export function UICanvas({
 
       {/* 右键菜单 & 属性弹窗 */}
       {contextMenu && (
-        <div className="fixed bg-slate-800 border border-slate-600 rounded shadow-xl py-1 w-36 z-[3000]" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => { setMovingComponentId(movingComponentId === contextMenu.componentId ? null : contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-white hover:bg-emerald-600 transition-colors flex items-center gap-2">
+        <div className="fixed bg-surface border border-line-strong rounded shadow-xl py-1 w-36 z-[3000]" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => { setMovingComponentId(movingComponentId === contextMenu.componentId ? null : contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-white hover:bg-brand-600 transition-colors flex items-center gap-2">
              {movingComponentId === contextMenu.componentId ? <Lock size={14} /> : <Move size={14} />}
              {movingComponentId === contextMenu.componentId ? '锁定位置' : '移动组件'}
           </button>
-          <div className="h-px bg-slate-700 my-1"></div>
-          <button onClick={() => { setEditingComponentId(contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-white hover:bg-purple-600 transition-colors">⚙️ 属性设置</button>
-          <div className="h-px bg-slate-700 my-1"></div>
-          <button onClick={() => deleteComponent(contextMenu.componentId)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 transition-colors">🗑️ 删除</button>
+          <div className="h-px bg-surface-3 my-1"></div>
+          <button onClick={() => { setEditingComponentId(contextMenu.componentId); setContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-white hover:bg-iris-600 transition-colors">⚙️ 属性设置</button>
+          <div className="h-px bg-surface-3 my-1"></div>
+          <button onClick={() => deleteComponent(contextMenu.componentId)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-surface-3 transition-colors">🗑️ 删除</button>
         </div>
       )}
       {editingComponentId && (

@@ -420,7 +420,13 @@ export class RoomClient {
       };
 
       socket.onmessage = (event) => {
-        const message = JSON.parse(String(event.data)) as CollaborationMessage;
+        let message: CollaborationMessage;
+        try {
+          message = JSON.parse(String(event.data)) as CollaborationMessage;
+        } catch (error) {
+          console.error('Failed to parse room message:', error);
+          return;
+        }
 
         switch (message.type) {
           case 'joined': {

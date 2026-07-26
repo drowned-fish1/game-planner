@@ -13,6 +13,8 @@ import {
   Wifi,
 } from 'lucide-react';
 import { TeamMember, TodoItem } from '../../utils/storage';
+import { toast } from '../../utils/toast';
+import { confirmDialog } from '../../utils/confirm';
 import {
   buildPeerServerUrl,
   discoverLanRooms,
@@ -102,13 +104,24 @@ export function TeamManager({
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
+  useEffect(() => {
+    if (!modal.isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModal((prev) => ({ ...prev, isOpen: false }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modal.isOpen]);
+
   const copyText = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
       setCopiedText(value);
       window.setTimeout(() => setCopiedText(''), 1800);
+      toast.success('已复制到剪贴板');
     } catch (error) {
       console.error('Copy failed:', error);
+      toast.error('复制失败');
     }
   };
 
@@ -138,7 +151,7 @@ export function TeamManager({
     if (!value) return;
 
     if (modal.type === 'add') {
-      const colors = ['bg-red-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-yellow-500', 'bg-orange-500', 'bg-pink-500'];
+      const colors = ['bg-red-500', 'bg-blue-500', 'bg-brand-500', 'bg-iris-500', 'bg-yellow-500', 'bg-orange-500', 'bg-pink-500'];
       const newMember: TeamMember = {
         id: uuidv4(),
         name: value,
@@ -214,35 +227,40 @@ export function TeamManager({
     event.target.value = '';
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const target = members.find((member) => member.id === contextMenu.memberId);
     if (!target) return;
-    if (!confirm(`确定移除成员 ${target.name} 吗？`)) return;
-
-    onUpdateMembers(members.filter((member) => member.id !== contextMenu.memberId));
-    onActivity({ kind: 'member:remove', message: `${profile.name} 移除了成员 ${target.name}` });
     setContextMenu((prev) => ({ ...prev, visible: false }));
+    const ok = await confirmDialog({
+      title: `确定移除成员 ${target.name} 吗？`,
+      confirmText: '移除',
+      danger: true,
+    });
+    if (!ok) return;
+
+    onUpdateMembers(members.filter((member) => member.id !== target.id));
+    onActivity({ kind: 'member:remove', message: `${profile.name} 移除了成员 ${target.name}` });
   };
 
   const roomPanel = (
     <div className="h-full min-h-0 overflow-y-auto">
       <div className="space-y-6 p-4 md:p-6 xl:p-8">
-        <section className="rounded-2xl border border-slate-700 bg-slate-800/90 p-5 shadow-xl">
+        <section className="rounded-2xl border border-line bg-surface/90 p-5 shadow-xl">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400">
+              <div className="rounded-xl bg-brand-500/10 p-3 text-brand-400">
                 <Wifi size={22} />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">联机房间</h2>
-                <p className="text-sm text-slate-400">{projectName} 的实时协作入口</p>
+                <p className="text-sm text-muted">{projectName} 的实时协作入口</p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => void onRefreshServiceInfo()}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-emerald-500 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-content transition-colors hover:border-brand-500 hover:text-white"
               >
                 <RefreshCw size={16} />
                 刷新端口
@@ -260,44 +278,44 @@ export function TeamManager({
           </div>
 
           <div className="mt-5 grid gap-4 xl:grid-cols-3">
-            <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+            <div className="rounded-xl border border-line bg-bg/70 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div className="text-sm font-semibold text-white">本地服务</div>
-                <div className={`rounded-full px-2 py-1 text-xs ${collaboration.serviceInfo?.ready ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                <div className={`rounded-full px-2 py-1 text-xs ${collaboration.serviceInfo?.ready ? 'bg-brand-500/15 text-brand-300' : 'bg-rose-500/15 text-rose-300'}`}>
                   {connectionLabel}
                 </div>
               </div>
 
-              <div className="space-y-3 text-sm text-slate-300">
-                <div className="rounded-lg border border-slate-700 bg-slate-950/70 p-3">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">本地端口</div>
+              <div className="space-y-3 text-sm text-content">
+                <div className="rounded-lg border border-line bg-bg/70 p-3">
+                  <div className="text-xs uppercase tracking-wide text-subtle">本地端口</div>
                   <div className="mt-1 flex items-center gap-2 text-base font-semibold text-white">
-                    <Server size={16} className="text-emerald-400" />
+                    <Server size={16} className="text-brand-400" />
                     {collaboration.serviceInfo?.port || '未启动'}
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                  <p className="mt-2 text-xs leading-5 text-muted">
                     这个端口既可以给 FRP TCP 转发，也可以给同局域网的设备直接加入。
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">可分享地址</div>
+                  <div className="text-xs uppercase tracking-wide text-subtle">可分享地址</div>
                   {shareableAddresses.length > 0 ? (
                     shareableAddresses.map((entry) => (
                       <button
                         key={entry.wsUrl}
                         onClick={() => void copyText(entry.wsUrl)}
-                        className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-left transition-colors hover:border-emerald-500"
+                        className="flex w-full items-center justify-between rounded-lg border border-line bg-bg/60 px-3 py-2 text-left transition-colors hover:border-brand-500"
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm text-white">{entry.wsUrl}</div>
-                          <div className="text-xs text-slate-500">{entry.httpUrl}</div>
+                          <div className="text-xs text-subtle">{entry.httpUrl}</div>
                         </div>
-                        <Copy size={14} className="shrink-0 text-slate-400" />
+                        <Copy size={14} className="shrink-0 text-muted" />
                       </button>
                     ))
                   ) : (
-                    <div className="rounded-lg border border-dashed border-slate-700 p-3 text-xs text-slate-500">
+                    <div className="rounded-lg border border-dashed border-line p-3 text-xs text-subtle">
                       还没有拿到可用地址，先点上面的“刷新端口”。
                     </div>
                   )}
@@ -305,7 +323,7 @@ export function TeamManager({
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+            <div className="rounded-xl border border-line bg-bg/70 p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
                 <PlugZap size={16} className="text-amber-400" />
                 房间信息
@@ -313,21 +331,21 @@ export function TeamManager({
 
               <div className="space-y-3">
                 <label className="block">
-                  <span className="mb-1 block text-xs text-slate-500">你的显示名称</span>
+                  <span className="mb-1 block text-xs text-subtle">你的显示名称</span>
                   <input
                     value={profile.name}
                     onChange={(event) => onUpdateProfile({ ...profile, name: event.target.value })}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
+                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
                     placeholder="输入房间昵称"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-xs text-slate-500">房间号</span>
+                  <span className="mb-1 block text-xs text-subtle">房间号</span>
                   <input
                     value={roomIdInput}
                     onChange={(event) => setRoomIdInput(event.target.value)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
+                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
                     placeholder={defaultRoomId}
                   />
                 </label>
@@ -335,20 +353,20 @@ export function TeamManager({
                 <button
                   onClick={() => void onHostRoom(roomIdInput.trim() || defaultRoomId)}
                   disabled={collaboration.connectionState === 'connecting'}
-                  className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                  className="w-full rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-muted"
                 >
                   主持当前项目房间
                 </button>
 
                 {collaboration.connectionState === 'connected' && (
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                  <div className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-xs text-brand-200">
                     当前房间：{collaboration.roomId} · {collaboration.mode === 'host' ? '你是房主' : '你已加入远程房间'}
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+            <div className="rounded-xl border border-line bg-bg/70 p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
                 <DoorOpen size={16} className="text-sky-400" />
                 加入远程房间
@@ -356,11 +374,11 @@ export function TeamManager({
 
               <div className="space-y-3">
                 <label className="block">
-                  <span className="mb-1 block text-xs text-slate-500">远程地址</span>
+                  <span className="mb-1 block text-xs text-subtle">远程地址</span>
                   <input
                     value={serverUrlInput}
                     onChange={(event) => setServerUrlInput(event.target.value)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
+                    className="w-full rounded-lg border border-line bg-bg/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-brand-500"
                     placeholder="frp-off.com:19077 或 ws://frp-off.com:19077/ws"
                   />
                 </label>
@@ -368,12 +386,12 @@ export function TeamManager({
                 <button
                   onClick={() => void onJoinRoom(serverUrlInput.trim(), roomIdInput.trim() || defaultRoomId)}
                   disabled={collaboration.connectionState === 'connecting'}
-                  className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                  className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-muted"
                 >
                   加入房间并同步项目
                 </button>
 
-                <div className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs leading-5 text-slate-400">
+                <div className="rounded-lg border border-line bg-bg/60 px-3 py-2 text-xs leading-5 text-muted">
                   支持 `frp-off.com:19077`、`ws://host:port/ws`、`http://host:port`。桌面端会通过主进程代理连接，所以 TCP 隧道也能用。
                 </div>
 
@@ -384,7 +402,7 @@ export function TeamManager({
                 )}
 
                 {copiedText && (
-                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                  <div className="rounded-lg border border-brand-500/20 bg-brand-500/10 px-3 py-2 text-xs text-brand-200">
                     已复制地址：{copiedText}
                   </div>
                 )}
@@ -392,16 +410,16 @@ export function TeamManager({
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+          <div className="mt-4 rounded-xl border border-line bg-bg/60 p-4">
             <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Network size={16} className="text-emerald-400" />
+                <Network size={16} className="text-brand-400" />
                 局域网房间
               </div>
               <button
                 onClick={() => void scanLanRooms()}
                 disabled={lanLoading}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-content transition-colors hover:border-brand-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {lanLoading ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
                 扫描局域网
@@ -412,20 +430,20 @@ export function TeamManager({
               {lanRooms.map(({ peer, room }) => {
                 const peerUrl = buildPeerServerUrl(peer);
                 return (
-                  <div key={`${peer.address}-${room.id}`} className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-950/60 p-3 md:flex-row md:items-center md:justify-between">
+                  <div key={`${peer.address}-${room.id}`} className="flex flex-col gap-3 rounded-lg border border-line bg-bg/60 p-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-white">{room.projectName || room.id}</div>
-                      <div className="mt-1 text-xs text-slate-400">
+                      <div className="mt-1 text-xs text-muted">
                         设备 {peer.deviceName} · 地址 {peer.address}:{peer.service?.port || '-'} · 房间号 {room.id}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-subtle">
                         {room.participantCount} 人在线 · 修订 {room.revision}
                       </div>
                     </div>
                     <button
                       onClick={() => void onJoinRoom(peerUrl, room.id)}
                       disabled={!peerUrl || collaboration.connectionState === 'connecting'}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                      className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-muted"
                     >
                       直接加入
                     </button>
@@ -434,7 +452,7 @@ export function TeamManager({
               })}
 
               {!lanLoading && lanRooms.length === 0 && (
-                <div className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-500">
+                <div className="rounded-lg border border-dashed border-line p-4 text-sm text-subtle">
                   还没有发现局域网中的房间。确保对方也打开了应用，并主持了一个房间后再扫描。
                 </div>
               )}
@@ -443,23 +461,23 @@ export function TeamManager({
         </section>
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <section className="rounded-2xl border border-slate-700 bg-slate-800/80 p-5 shadow-xl">
+          <section className="rounded-2xl border border-line bg-surface/80 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-                  <Users size={18} className="text-emerald-400" />
+                  <Users size={18} className="text-brand-400" />
                   在线协作者
                 </h3>
-                <p className="mt-1 text-sm text-slate-400">显示大家正在看的模块和最近状态</p>
+                <p className="mt-1 text-sm text-muted">显示大家正在看的模块和最近状态</p>
               </div>
-              <div className="rounded-full bg-slate-900 px-3 py-1 text-xs text-slate-300">
+              <div className="rounded-full bg-bg px-3 py-1 text-xs text-content">
                 {collaboration.participants.length} 人在线
               </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               {collaboration.participants.map((participant) => (
-                <div key={participant.connectionId} className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+                <div key={participant.connectionId} className="rounded-xl border border-line bg-bg/70 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <div
@@ -473,31 +491,31 @@ export function TeamManager({
                           {participant.name}
                           {participant.connectionId === collaboration.selfConnectionId ? ' (你)' : ''}
                         </div>
-                        <div className="truncate text-xs text-slate-500">
+                        <div className="truncate text-xs text-subtle">
                           {participant.isHost ? '房主' : '协作者'} · {participant.presence.activeModule}
                         </div>
                       </div>
                     </div>
-                    <div className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] text-emerald-300">
+                    <div className="rounded-full bg-brand-500/15 px-2 py-1 text-[10px] text-brand-300">
                       在线
                     </div>
                   </div>
 
-                  <div className="mt-3 rounded-lg bg-slate-950/70 px-3 py-2 text-sm text-slate-300">
+                  <div className="mt-3 rounded-lg bg-bg/70 px-3 py-2 text-sm text-content">
                     {participant.presence.status || '在线待命'}
                   </div>
                 </div>
               ))}
 
               {collaboration.participants.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-subtle">
                   还没有人在房间里。先主持一个房间，或者加入一个局域网 / 远程房间。
                 </div>
               )}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-700 bg-slate-800/80 p-5 shadow-xl">
+          <section className="rounded-2xl border border-line bg-surface/80 p-5 shadow-xl">
             <div className="mb-4 flex items-center gap-2 text-lg font-bold text-white">
               <Activity size={18} className="text-amber-400" />
               最近活动
@@ -505,18 +523,18 @@ export function TeamManager({
 
             <div className="space-y-3">
               {collaboration.activityLog.map((activityItem) => (
-                <div key={activityItem.id} className="rounded-xl border border-slate-700 bg-slate-900/70 p-3">
+                <div key={activityItem.id} className="rounded-xl border border-line bg-bg/70 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-white">
                     <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: activityItem.color }} />
                     {activityItem.actorName}
                   </div>
-                  <div className="mt-1 text-sm text-slate-300">{activityItem.message}</div>
-                  <div className="mt-2 text-[11px] uppercase tracking-wide text-slate-500">{activityItem.module}</div>
+                  <div className="mt-1 text-sm text-content">{activityItem.message}</div>
+                  <div className="mt-2 text-[11px] uppercase tracking-wide text-subtle">{activityItem.module}</div>
                 </div>
               ))}
 
               {collaboration.activityLog.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-subtle">
                   房间活动会显示在这里，比如谁加入、谁改了磁贴、谁更新了任务。
                 </div>
               )}
@@ -529,14 +547,14 @@ export function TeamManager({
 
   const membersPanel = (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 pb-4 pt-4 md:px-8">
+      <div className="flex shrink-0 items-center justify-between border-b border-line px-4 pb-4 pt-4 md:px-8">
         <div>
           <h2 className="text-xl font-bold text-white md:text-3xl">团队成员</h2>
-          <p className="mt-1 text-xs text-slate-400 md:text-sm">右键成员卡片可以改名、改职责或换头像</p>
+          <p className="mt-1 text-xs text-muted md:text-sm">右键成员卡片可以改名、改职责或换头像</p>
         </div>
         <button
           onClick={() => setModal({ isOpen: true, type: 'add', inputValue: '' })}
-          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition-colors hover:bg-emerald-500"
+          className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition-colors hover:bg-brand-500"
         >
           <span>+</span>
           <span className="hidden md:inline">添加成员</span>
@@ -550,14 +568,14 @@ export function TeamManager({
               key={member.id}
               onClick={(event) => window.innerWidth < 768 && handleContextMenu(event, member.id)}
               onContextMenu={(event) => handleContextMenu(event, member.id)}
-              className="group relative flex cursor-pointer select-none flex-col items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-4 transition-all hover:-translate-y-1 hover:border-emerald-500 hover:shadow-xl md:p-6"
+              className="group relative flex cursor-pointer select-none flex-col items-center gap-3 rounded-xl border border-line bg-surface p-4 transition-all hover:-translate-y-1 hover:border-brand-500 hover:shadow-xl md:p-6"
             >
-              <div className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-slate-700 text-2xl font-bold text-white shadow-inner md:h-20 md:w-20 md:text-3xl ${member.color}`}>
+              <div className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-line text-2xl font-bold text-white shadow-inner md:h-20 md:w-20 md:text-3xl ${member.color}`}>
                 {member.avatar ? <img src={member.avatar} className="h-full w-full object-cover" /> : member.name[0]}
               </div>
               <div className="w-full text-center">
                 <h3 className="truncate px-2 text-base font-bold text-white md:text-lg">{member.name}</h3>
-                <div className="mt-1 inline-block max-w-full truncate rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] text-emerald-400 md:text-xs">
+                <div className="mt-1 inline-block max-w-full truncate rounded border border-line bg-bg px-2 py-0.5 text-[10px] text-brand-400 md:text-xs">
                   {member.role}
                 </div>
               </div>
@@ -565,7 +583,7 @@ export function TeamManager({
           ))}
 
           {members.length === 0 && (
-            <div className="col-span-full rounded-xl border-2 border-dashed border-slate-800 py-10 text-center text-slate-500">
+            <div className="col-span-full rounded-xl border-2 border-dashed border-line py-10 text-center text-subtle">
               还没有成员，先添加几个一起协作。
             </div>
           )}
@@ -581,20 +599,20 @@ export function TeamManager({
   );
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-slate-900">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-bg">
       <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} className="hidden" accept="image/*" />
 
-      <div className="flex shrink-0 border-b border-slate-700 bg-slate-800 md:hidden">
+      <div className="flex shrink-0 border-b border-line bg-surface md:hidden">
         <MobileTabButton label="房间" active={activeTab === 'room'} onClick={() => setActiveTab('room')} />
         <MobileTabButton label="成员" active={activeTab === 'members'} onClick={() => setActiveTab('members')} />
         <MobileTabButton label="待办" active={activeTab === 'todos'} onClick={() => setActiveTab('todos')} />
       </div>
 
       <div className="hidden min-h-0 flex-1 overflow-hidden md:grid md:grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <div className="min-h-0 overflow-hidden border-b border-slate-800">{roomPanel}</div>
+        <div className="min-h-0 overflow-hidden border-b border-line">{roomPanel}</div>
         <div className="grid min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)_22rem]">
           <div className="min-h-0 overflow-hidden">{membersPanel}</div>
-          <div className="min-h-0 overflow-hidden border-l border-slate-800">{todosPanel}</div>
+          <div className="min-h-0 overflow-hidden border-l border-line">{todosPanel}</div>
         </div>
       </div>
 
@@ -606,7 +624,7 @@ export function TeamManager({
 
       {modal.isOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))}>
-          <div className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <h3 className="mb-4 text-xl font-bold text-white">
               {modal.type === 'add' ? '添加新成员' : modal.type === 'rename' ? '修改名字' : '修改职责'}
             </h3>
@@ -616,13 +634,13 @@ export function TeamManager({
                 value={modal.inputValue}
                 onChange={(event) => setModal((prev) => ({ ...prev, inputValue: event.target.value }))}
                 placeholder={modal.type === 'role' ? '例如：主程 / 数值 / 关卡策划' : '请输入内容'}
-                className="mb-6 w-full rounded border border-slate-600 bg-slate-900 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                className="mb-6 w-full rounded border border-line-strong bg-bg px-4 py-3 text-white outline-none focus:border-brand-500"
               />
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))} className="px-4 py-2 text-slate-400 transition-colors hover:text-white">
+                <button type="button" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))} className="px-4 py-2 text-muted transition-colors hover:text-white">
                   取消
                 </button>
-                <button type="submit" className="rounded bg-emerald-600 px-6 py-2 font-bold text-white shadow-lg transition-colors hover:bg-emerald-500">
+                <button type="submit" className="rounded bg-brand-600 px-6 py-2 font-bold text-white shadow-lg transition-colors hover:bg-brand-500">
                   确认
                 </button>
               </div>
@@ -635,22 +653,22 @@ export function TeamManager({
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setContextMenu((prev) => ({ ...prev, visible: false }))} />
           <div
-            className="fixed z-[9999] flex w-44 flex-col rounded-lg border border-slate-600 bg-slate-800 py-1 shadow-2xl"
+            className="fixed z-[9999] flex w-44 flex-col rounded-lg border border-line-strong bg-surface py-1 shadow-2xl"
             style={{ top: contextMenu.y, left: contextMenu.x }}
           >
-            <div className="border-b border-slate-700 bg-slate-900/50 px-4 py-2 text-xs font-bold text-slate-500">
+            <div className="border-b border-line bg-bg/50 px-4 py-2 text-xs font-bold text-subtle">
               管理：{members.find((member) => member.id === contextMenu.memberId)?.name}
             </div>
-            <button onClick={openRenameModal} className="px-4 py-3 text-left text-sm text-slate-200 transition-colors hover:bg-emerald-600 hover:text-white">
+            <button onClick={openRenameModal} className="px-4 py-3 text-left text-sm text-content transition-colors hover:bg-brand-600 hover:text-white">
               修改名字
             </button>
-            <button onClick={openRoleModal} className="px-4 py-3 text-left text-sm text-slate-200 transition-colors hover:bg-emerald-600 hover:text-white">
+            <button onClick={openRoleModal} className="px-4 py-3 text-left text-sm text-content transition-colors hover:bg-brand-600 hover:text-white">
               修改职责
             </button>
-            <button onClick={() => fileInputRef.current?.click()} className="px-4 py-3 text-left text-sm text-slate-200 transition-colors hover:bg-emerald-600 hover:text-white">
+            <button onClick={() => fileInputRef.current?.click()} className="px-4 py-3 text-left text-sm text-content transition-colors hover:bg-brand-600 hover:text-white">
               更换头像
             </button>
-            <div className="mx-2 my-1 h-px bg-slate-700" />
+            <div className="mx-2 my-1 h-px bg-surface-3" />
             <button onClick={handleDelete} className="rounded-b-lg px-4 py-3 text-left text-sm text-red-400 transition-colors hover:bg-red-600 hover:text-white">
               移除成员
             </button>
@@ -665,7 +683,7 @@ function MobileTabButton({ label, active, onClick }: { label: string; active: bo
   return (
     <button
       onClick={onClick}
-      className={`flex-1 py-3 text-sm font-bold transition-colors ${active ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-slate-400'}`}
+      className={`flex-1 py-3 text-sm font-bold transition-colors ${active ? 'border-b-2 border-brand-400 text-brand-400' : 'text-muted'}`}
     >
       {label}
     </button>

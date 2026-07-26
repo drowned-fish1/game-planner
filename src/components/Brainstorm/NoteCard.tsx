@@ -2,10 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { Resizable } from 'react-resizable';
 import { Sparkles, Loader2, Bot, Play, GripHorizontal } from 'lucide-react';
-import { AIConfig } from '../Settings/Settings'; 
+import { AIConfig } from '../Settings/Settings';
+import { toast } from '../../utils/toast';
 
 const STORAGE_KEY_CONFIGS = 'gp_ai_configs';
 const STORAGE_KEY_ACTIVE = 'gp_ai_active_id';
+
+export type ConnectorHandle = 'top' | 'right' | 'bottom' | 'left';
 
 interface NoteCardProps {
   id: string;
@@ -20,12 +23,14 @@ interface NoteCardProps {
   inputs?: string[];
   // 1. 新增：接收 disabled 属性
   disabled?: boolean; 
+  isDesktop?: boolean;
+  showConnectionHandles?: boolean;
+  activeConnectHandle?: ConnectorHandle | null;
   onUpdate: (id: string, content: string) => void;
   onResize?: (id: string, width: number, height: number) => void;
   onDelete: (id: string) => void;
   onDrag: (id: string, x: number, y: number) => void;
-  onConnectStart?: (id: string) => void;
-  onConnectEnd?: (id: string) => void;
+  onConnectHandleClick?: (id: string, handle: ConnectorHandle) => void;
 }
 
 const STATUS_TYPES = {
@@ -268,9 +273,26 @@ function DrawingCardContent({ content, width, height, onChange }: DrawingCardCon
   );
 }
 
-export function NoteCard({ 
-  id, type, content, x, y, width, height, scale, isSelected, inputs = [], disabled, // 2. 解构 disabled
-  onUpdate, onResize, onDelete, onDrag, onConnectStart, onConnectEnd 
+export function NoteCard({
+  id,
+  type,
+  content,
+  x,
+  y,
+  width,
+  height,
+  scale,
+  isSelected,
+  inputs = [],
+  disabled,
+  isDesktop = false,
+  showConnectionHandles = true,
+  activeConnectHandle = null,
+  onUpdate,
+  onResize,
+  onDelete,
+  onDrag,
+  onConnectHandleClick,
 }: NoteCardProps) {
   const nodeRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -293,7 +315,7 @@ export function NoteCard({
     const activeId = localStorage.getItem(STORAGE_KEY_ACTIVE);
     
     if (!savedConfigs) {
-        alert("请先在左侧【设置】中配置 AI API");
+        toast.warning("请先在左侧【设置】中配置 AI API");
         return;
     }
 
@@ -301,7 +323,7 @@ export function NoteCard({
     const config = configs.find(c => c.id === activeId) || configs[0];
 
     if (!config || !config.key || !config.url) {
-        alert("AI 配置无效，请检查设置。");
+        toast.error("AI 配置无效，请检查设置。");
         return;
     }
 
@@ -312,7 +334,7 @@ export function NoteCard({
         prompt = `请处理以下内容：\n${content}`;
     } else {
         if (inputs.length === 0) {
-            alert("没有连线输入，无法处理。");
+            toast.warning("没有连线输入，无法处理。");
             setIsLoading(false);
             return;
         }
@@ -348,7 +370,7 @@ export function NoteCard({
         }
     } catch (e) {
         console.error(e);
-        alert("请求失败，请检查网络或 Key。");
+        toast.error("请求失败，请检查网络或 Key。");
     } finally {
         setIsLoading(false);
     }
@@ -458,13 +480,38 @@ export function NoteCard({
   else if (type === 'video' || type === 'audio') bgClass = "bg-slate-900 border border-slate-700";
   else if (type === 'drawing') bgClass = "bg-slate-100 border border-slate-300";
 
-  const handleStyle = "w-6 h-6 bg-white border-2 border-slate-400 hover:bg-emerald-500 rounded-full absolute z-[100] shadow-sm flex items-center justify-center touch-none";
-  const handleTouchEvents = (id: string) => ({
-      onPointerDown: (e: React.PointerEvent) => { e.stopPropagation(); onConnectStart?.(id); },
-      onPointerUp: (e: React.PointerEvent) => { e.stopPropagation(); onConnectEnd?.(id); },
-      onTouchStart: (e: React.TouchEvent) => { e.stopPropagation(); onConnectStart?.(id); },
-      onTouchEnd: (e: React.TouchEvent) => { e.stopPropagation(); onConnectEnd?.(id); }
-  });
+  const handleBaseClass = `absolute z-[100] flex h-6 w-6 items-center justify-center rounded-full border shadow-lg touch-none transition-all duration-200 ${
+    isDesktop
+      ? showConnectionHandles
+        ? 'scale-100 opacity-100 pointer-events-auto'
+        : 'scale-75 opacity-0 pointer-events-none group-hover:scale-100 group-hover:opacity-100 group-hover:pointer-events-auto'
+      : 'scale-100 opacity-100 pointer-events-auto'
+  }`;
+
+  const renderConnectHandle = (handle: ConnectorHandle, positionClass: string) => {
+    const isActive = activeConnectHandle === handle;
+
+    return (
+      <button
+        type="button"
+        key={handle}
+        onMouseDown={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onConnectHandleClick?.(id, handle);
+        }}
+        className={`${handleBaseClass} ${positionClass} ${
+          isActive
+            ? 'border-emerald-200 bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.65)]'
+            : 'border-slate-600 bg-slate-900/90 hover:border-emerald-300 hover:bg-emerald-500/90'
+        }`}
+        title={'\u8fde\u63a5\u78c1\u8d34'}
+      >
+        <span className={`block rounded-full ${isActive ? 'h-2.5 w-2.5 bg-white' : 'h-2 w-2 bg-emerald-300'}`} />
+      </button>
+    );
+  };
 
   return (
     <Draggable 
@@ -506,10 +553,10 @@ export function NoteCard({
          </Resizable>
 
          {/* 连线锚点 */}
-         <div className={`${handleStyle} -top-3 left-1/2 -translate-x-1/2`} {...handleTouchEvents(id)} />
-         <div className={`${handleStyle} -bottom-3 left-1/2 -translate-x-1/2`} {...handleTouchEvents(id)} />
-         <div className={`${handleStyle} top-1/2 -left-3 -translate-y-1/2`} {...handleTouchEvents(id)} />
-         <div className={`${handleStyle} top-1/2 -right-3 -translate-y-1/2`} {...handleTouchEvents(id)} />
+         {renderConnectHandle('top', '-top-3 left-1/2 -translate-x-1/2')}
+         {renderConnectHandle('bottom', '-bottom-3 left-1/2 -translate-x-1/2')}
+         {renderConnectHandle('left', 'top-1/2 -left-3 -translate-y-1/2')}
+         {renderConnectHandle('right', 'top-1/2 -right-3 -translate-y-1/2')}
       </div>
     </Draggable>
   );
