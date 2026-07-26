@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2, Moon, Sun, Palette } from 'lucide-react';
+import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2, Moon, Sun, Palette, Languages } from 'lucide-react';
 import { toast } from '../../utils/toast';
 import { confirmDialog } from '../../utils/confirm';
 import { testAIConnection } from '../../utils/aiService';
 import { getTheme, setTheme, ThemeMode } from '../../utils/theme';
+import { useLocale } from '../../i18n/LocaleContext';
 
 export interface AIConfig {
   id: string;
@@ -36,6 +37,7 @@ export function Settings() {
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [testingId, setTestingId] = useState<string | null>(null);
   const [theme, setThemeState] = useState<ThemeMode>(() => getTheme());
+  const { locale, setLocale, t } = useLocale();
 
   const switchTheme = (mode: ThemeMode) => {
     setThemeState(mode);
@@ -124,7 +126,7 @@ export function Settings() {
             <div className="grid h-9 w-9 place-items-center rounded-lg border border-brand-500/25 bg-brand-500/10 text-brand-400">
               <Settings2 size={18} />
             </div>
-            <h1 className="text-lg font-bold md:text-2xl">设置</h1>
+            <h1 className="text-lg font-bold md:text-2xl">{t((m) => m.common.settings)}</h1>
         </div>
         <div className="flex items-center gap-3">
           {saveSuccess && <span className="flex animate-fade-in items-center gap-1 text-sm text-brand-400"><Check size={16}/> 已保存</span>}
@@ -143,10 +145,11 @@ export function Settings() {
         <div className="mx-auto max-w-4xl space-y-8">
             {/* 外观板块 */}
             <section>
-                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><Palette size={20} className="text-brand-400"/> 外观</h2>
-                <div className="card flex flex-wrap items-center justify-between gap-4 p-4">
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><Palette size={20} className="text-brand-400"/> {t((m) => m.app.paletteAppearance)}</h2>
+                <div className="space-y-3">
+                  <div className="card flex flex-wrap items-center justify-between gap-4 p-4">
                     <div>
-                        <div className="text-sm font-semibold text-content">主题</div>
+                        <div className="text-sm font-semibold text-content">{t((m) => m.settings.theme)}</div>
                         <div className="mt-0.5 text-xs text-muted">深色为默认；切换立即生效并记住偏好</div>
                     </div>
                     <div className="flex gap-2">
@@ -155,16 +158,39 @@ export function Settings() {
                             className={theme === 'dark' ? 'btn-primary' : 'btn-outline'}
                             aria-pressed={theme === 'dark'}
                         >
-                            <Moon size={15} /> 深色
+                            <Moon size={15} /> {t((m) => m.settings.themeDark)}
                         </button>
                         <button
                             onClick={() => switchTheme('light')}
                             className={theme === 'light' ? 'btn-primary' : 'btn-outline'}
                             aria-pressed={theme === 'light'}
                         >
-                            <Sun size={15} /> 浅色
+                            <Sun size={15} /> {t((m) => m.settings.themeLight)}
                         </button>
                     </div>
+                  </div>
+                  <div className="card flex flex-wrap items-center justify-between gap-4 p-4">
+                    <div>
+                        <div className="text-sm font-semibold text-content">{t((m) => m.settings.language)}</div>
+                        <div className="mt-0.5 text-xs text-muted">默认中文；缺失翻译自动回退中文</div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setLocale('zh-CN')}
+                            className={locale === 'zh-CN' ? 'btn-primary' : 'btn-outline'}
+                            aria-pressed={locale === 'zh-CN'}
+                        >
+                            <Languages size={15} /> {t((m) => m.settings.languageZh)}
+                        </button>
+                        <button
+                            onClick={() => setLocale('en-US')}
+                            className={locale === 'en-US' ? 'btn-primary' : 'btn-outline'}
+                            aria-pressed={locale === 'en-US'}
+                        >
+                            <Languages size={15} /> {t((m) => m.settings.languageEn)}
+                        </button>
+                    </div>
+                  </div>
                 </div>
             </section>
 

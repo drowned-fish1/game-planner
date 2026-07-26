@@ -41,6 +41,8 @@ import {
   type RoomActivity,
 } from './utils/collaboration';
 import { describeReconnectAttempt } from './utils/roomConnection';
+import { useLocale } from './i18n/LocaleContext';
+import type { Messages } from './i18n/messages';
 
 // 五大工作模块按需拆包：进入对应模块时才加载其代码（tiptap/白板画布等重依赖不进主包）
 const BrainstormBoard = lazy(() => import('./components/Brainstorm/Board').then((m) => ({ default: m.BrainstormBoard })));
@@ -82,6 +84,7 @@ function App() {
   const [profile, setProfile] = useState<CollaborationProfile>(() => loadCollaborationProfile());
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const { t } = useLocale();
 
   const roomClientRef = useRef<RoomClient | null>(null);
   const projectContentRef = useRef<ProjectContent | null>(null);
@@ -376,9 +379,9 @@ function App() {
       setSaveStatus('saving');
       saveProjectContent(currentProject.id, projectContent);
       window.setTimeout(() => setSaveStatus('saved'), 500);
-      toast.success('项目已保存');
+      toast.success(t((m) => m.app.projectSaved));
     }
-  }, [currentProject, projectContent]);
+  }, [currentProject, projectContent, t]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -485,31 +488,31 @@ function App() {
     return [
       ...MODULES.map((m) => ({
         id: `goto-${m.id}`,
-        label: `跳转：${m.label}`,
-        hint: m.hint,
+        label: t((msg) => msg.app.paletteGoto)(t(m.label)),
+        hint: t(m.hint),
         keywords: m.id,
         perform: () => setActiveModule(m.id),
       })),
-      { id: 'goto-settings', label: '跳转：设置', hint: 'AI 服务配置', keywords: 'settings', perform: () => setActiveModule('settings') },
-      { id: 'save', label: '保存项目', hint: 'Ctrl+S', keywords: 'save', perform: saveNow },
+      { id: 'goto-settings', label: t((m) => m.app.paletteGotoSettings), hint: t((m) => m.app.paletteGotoSettingsHint), keywords: 'settings', perform: () => setActiveModule('settings') },
+      { id: 'save', label: t((m) => m.app.paletteSaveProject), hint: 'Ctrl+S', keywords: 'save', perform: saveNow },
       {
         id: 'toggle-theme',
-        label: '切换深色 / 浅色主题',
-        hint: '外观',
+        label: t((m) => m.app.paletteToggleTheme),
+        hint: t((m) => m.app.paletteToggleThemeHint),
         keywords: 'theme dark light 主题',
         perform: () => setTheme(getTheme() === 'light' ? 'dark' : 'light'),
       },
-      { id: 'back-home', label: '返回项目大厅', hint: '自动保存后退出', keywords: 'back home dashboard', perform: closeProject },
-      { id: 'shortcut-help', label: '查看快捷键', hint: '?', keywords: 'shortcut help keyboard', perform: () => setHelpOpen(true) },
+      { id: 'back-home', label: t((m) => m.app.paletteBackHome), hint: t((m) => m.app.paletteBackHomeHint), keywords: 'back home dashboard', perform: closeProject },
+      { id: 'shortcut-help', label: t((m) => m.app.paletteShortcutHelp), hint: '?', keywords: 'shortcut help keyboard', perform: () => setHelpOpen(true) },
     ];
-  }, [currentProject, closeProject, saveNow]);
+  }, [currentProject, closeProject, saveNow, t]);
 
   if (!currentProject) return <Dashboard onOpenProject={openProject} />;
   if (!projectContent) {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-bg text-content">
         <Loader2 size={28} className="animate-spin text-brand-400" />
-        <span className="text-sm text-muted">正在载入项目…</span>
+        <span className="text-sm text-muted">{t((m) => m.app.loadingProject)}</span>
       </div>
     );
   }
@@ -577,11 +580,16 @@ interface ProjectEditorLayoutProps {
   }) => void;
 }
 
-const MODULES: { id: ModuleType; label: string; icon: JSX.Element; hint: string }[] = [
-  { id: 'brainstorm', label: '灵感白板', icon: <Lightbulb size={18} />, hint: '整理创意与关联' },
-  { id: 'team', label: '房间联机', icon: <Users size={18} />, hint: '多人实时协作' },
-  { id: 'docs', label: '策划文档', icon: <FileText size={18} />, hint: '撰写设计方案' },
-  { id: 'ui', label: 'UI 原型', icon: <Layout size={18} />, hint: '搭建界面草图' },
+const MODULES: {
+  id: ModuleType;
+  label: (m: Messages) => string;
+  icon: JSX.Element;
+  hint: (m: Messages) => string;
+}[] = [
+  { id: 'brainstorm', label: (m) => m.app.moduleBrainstorm, icon: <Lightbulb size={18} />, hint: (m) => m.app.moduleBrainstormHint },
+  { id: 'team', label: (m) => m.app.moduleTeam, icon: <Users size={18} />, hint: (m) => m.app.moduleTeamHint },
+  { id: 'docs', label: (m) => m.app.moduleDocs, icon: <FileText size={18} />, hint: (m) => m.app.moduleDocsHint },
+  { id: 'ui', label: (m) => m.app.moduleUi, icon: <Layout size={18} />, hint: (m) => m.app.moduleUiHint },
 ];
 
 function ProjectEditorLayout({
@@ -608,9 +616,10 @@ function ProjectEditorLayout({
   onPresenceChange,
   onActivity,
 }: ProjectEditorLayoutProps) {
+  const { t } = useLocale();
   const isConnected = collaboration.connectionState === 'connected';
   const activeMeta = MODULES.find((m) => m.id === activeModule);
-  const activeTitle = activeModule === 'settings' ? '设置' : activeMeta?.label ?? '';
+  const activeTitle = activeModule === 'settings' ? t((m) => m.common.settings) : activeMeta ? t(activeMeta.label) : '';
 
   const renderModule = () => {
     switch (activeModule) {
@@ -666,8 +675,8 @@ function ProjectEditorLayout({
         <div className="flex h-16 items-center gap-2.5 border-b border-line px-3">
           <button
             onClick={onBack}
-            title="返回项目大厅"
-            aria-label="返回项目大厅"
+            title={t((m) => m.app.backToDashboard)}
+            aria-label={t((m) => m.app.backToDashboard)}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-3 hover:text-content"
           >
             <ChevronLeft size={20} />
@@ -676,7 +685,7 @@ function ProjectEditorLayout({
             <div className="truncate text-[15px] font-semibold leading-tight text-content">{project.name}</div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-subtle">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-400" />
-              游戏策划工作台
+              {t((m) => m.app.workbench)}
             </div>
           </div>
         </div>
@@ -684,14 +693,14 @@ function ProjectEditorLayout({
         {/* Nav */}
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           <div className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">
-            工作模块
+            {t((m) => m.app.workModules)}
           </div>
           {MODULES.map((m) => (
             <SidebarBtn
               key={m.id}
               icon={m.icon}
-              label={m.label}
-              hint={m.hint}
+              label={t(m.label)}
+              hint={t(m.hint)}
               isActive={activeModule === m.id}
               onClick={() => onSetActiveModule(m.id)}
             />
@@ -702,7 +711,7 @@ function ProjectEditorLayout({
         <div className="space-y-2 border-t border-line p-3">
           <SidebarBtn
             icon={<SettingsIcon size={18} />}
-            label="设置"
+            label={t((m) => m.common.settings)}
             isActive={activeModule === 'settings'}
             onClick={() => onSetActiveModule('settings')}
           />
@@ -722,7 +731,7 @@ function ProjectEditorLayout({
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-        <button onClick={onBack} title="返回项目大厅" aria-label="返回项目大厅" className="grid h-9 w-9 place-items-center rounded-lg text-muted active:bg-surface-3">
+        <button onClick={onBack} title={t((m) => m.app.backToDashboard)} aria-label={t((m) => m.app.backToDashboard)} className="grid h-9 w-9 place-items-center rounded-lg text-muted active:bg-surface-3">
           <ChevronLeft size={22} />
         </button>
         <div className="min-w-0 flex-1 px-2 text-center">
@@ -731,8 +740,8 @@ function ProjectEditorLayout({
         </div>
         <button
           onClick={() => onSetActiveModule('settings')}
-          title="设置"
-          aria-label="设置"
+          title={t((m) => m.common.settings)}
+          aria-label={t((m) => m.common.settings)}
           className={`grid h-9 w-9 place-items-center rounded-lg active:bg-surface-3 ${
             activeModule === 'settings' ? 'text-brand-400' : 'text-muted'
           }`}
@@ -752,7 +761,7 @@ function ProjectEditorLayout({
           <MobileNavBtn
             key={m.id}
             icon={m.icon}
-            label={m.label}
+            label={t(m.label)}
             isActive={activeModule === m.id}
             onClick={() => onSetActiveModule(m.id)}
           />
@@ -812,19 +821,21 @@ function StatusPill({
   peopleCount: number;
   saveStatus: 'saved' | 'saving' | 'unsaved';
 }) {
+  const { t } = useLocale();
+
   if (isConnected) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-brand-500/25 bg-brand-500/10 px-3 py-2 text-xs font-medium text-brand-300">
         <Users size={14} />
-        房间中 · {peopleCount} 人在线
+        {t((m) => m.app.roomOnline)(peopleCount)}
       </div>
     );
   }
 
   const map = {
-    saving: { icon: <Loader2 size={14} className="animate-spin" />, text: '正在保存…', cls: 'text-amber-300' },
-    unsaved: { icon: <CircleDot size={14} />, text: '有未保存改动', cls: 'text-subtle' },
-    saved: { icon: <Check size={14} />, text: '已保存', cls: 'text-muted' },
+    saving: { icon: <Loader2 size={14} className="animate-spin" />, text: t((m) => m.app.saveStatusSaving), cls: 'text-amber-300' },
+    unsaved: { icon: <CircleDot size={14} />, text: t((m) => m.app.saveStatusUnsaved), cls: 'text-subtle' },
+    saved: { icon: <Check size={14} />, text: t((m) => m.app.saveStatusSaved), cls: 'text-muted' },
   }[saveStatus];
 
   return (

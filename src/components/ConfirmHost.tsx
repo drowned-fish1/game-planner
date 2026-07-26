@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { getPendingConfirm, settleConfirm, subscribeConfirm, type PendingConfirm } from '../utils/confirm';
+import { useLocale } from '../i18n/LocaleContext';
 
 export function ConfirmHost() {
   const [current, setCurrent] = useState<PendingConfirm | null>(getPendingConfirm());
+  const { t } = useLocale();
 
   useEffect(() => subscribeConfirm((next) => setCurrent(next)), []);
 
@@ -47,14 +49,14 @@ export function ConfirmHost() {
 
         <div className="mt-5 flex justify-end gap-2.5">
           <button onClick={() => settleConfirm(false)} className="btn-ghost">
-            {current.cancelText || '取消'}
+            {current.cancelText || t((m) => m.common.cancel)}
           </button>
           <button
             onClick={() => settleConfirm(true)}
             autoFocus
             className={current.danger ? 'btn-danger' : 'btn-primary'}
           >
-            {current.confirmText || '确认'}
+            {current.confirmText || t((m) => m.common.confirm)}
           </button>
         </div>
       </div>

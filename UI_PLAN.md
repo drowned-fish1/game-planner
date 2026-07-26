@@ -100,6 +100,7 @@
 23. 浅色主题：主题令牌、切换入口与本地偏好持久化。
 24. 质量门禁：pre-commit 执行 TypeScript、ESLint 和单元测试；补齐 `storage` 与 `normalizeRoomServerUrl` 关键路径测试。
 25. 全链路回归（见 `REGRESSION_CHECKLIST.md`）：生产构建下大厅/白板/文档/联机/UI 原型/设置全量验证（桌面+375px、深浅色）；修复 Electron dev 硬编码 5173 端口导致端口被占时加载错误应用的缺陷（改用 `VITE_DEV_SERVER_URL`）。
+26.9. （迭代 31）i18n 基础设施：`src/i18n/`（messages.ts 类型安全字典 zh-CN 全量 + en-US 可部分、LocaleProvider Context + `t(selector)` 取词，缺失翻译运行时回退 zh-CN，无第三方依赖）；设置页新增语言切换（`gp_locale` 持久化，默认 zh-CN）。已迁移文案：App 外壳（侧栏/移动导航/保存状态/命令面板动作/载入态）、ModuleBoundary、ConfirmHost 默认按钮、Settings 外观区。**待迁移**：Dashboard、Board、Docs、Team、UIPrototype 模块内部文案（继续用 `t((m)=>…)` 增量迁移即可）；协作 presence 文案（moduleStatusLabel 等）发往对端，属协议内容暂不抽。双主题 × 桌面/375px 已实测切换与持久化。
 26.8. （迭代 30）发行质量（见 `RELEASE_CHECKLIST.md`）：删除占位 `electron-builder.json5` 隐患；补齐 package.json description/author、版权 2024-2026；`electron:build` 全流程通过并以 CDP 驱动打包产物实测存储/导入导出/主题持久化与重启恢复；Android `assembleDebug` APK 构建并在模拟器安装启动、WebView 渲染实证。版本号未动、未发布。
 26.7. （迭代 29）性能与离线：五大模块 React.lazy 按需拆包（`ModuleBoundary` 统一 loading/错误重试 UI）；主入口 chunk 848KB → 204KB（gzip 65KB），Docs 367KB / Board 173KB 等按模块加载；Inter/Space Grotesk woff2（OFL）本地打包进 `src/assets/fonts`，index.html 移除 Google Fonts，运行时零外网请求（浏览器网络面板实证）。注意：依赖树是 cnpm/npminstall 布局，勿用 `npm install` 加包。
 26.6. （迭代 28）核心测试补充：总计 67 用例。新增 theme（8）、aiService（10，fetch 全打桩不依赖外网）、boardGeometry（框选矩形/碰撞/吸附纯函数 12）；storage 增补 IPC 读写失败、localStorage 读写失败、旧版存档缺字段迁移、导入深拷贝与字段清洗；Board 框选/碰撞/吸附逻辑提取到 `Brainstorm/boardGeometry.ts`（浏览器实测拖动/吸附/框选/批删行为不变）；storage 补上保存路径 IPC 异常与读取路径 localStorage 异常的防护。
@@ -127,7 +128,7 @@
 
 ### P3 — 工程化
 - ~~**[协作健壮性（需联机测试）]**~~ ✅ 已完成（迭代 26，真实双客户端 + 浏览器 UI 联机验证）
-- **[i18n]** 抽离中文文案到字典，为将来多语言铺路。
+- ~~**[i18n]**~~ ✅ 基础设施已完成（迭代 31）；剩余模块文案按 26.9 增量迁移。
 - ~~**[质量门禁]**~~ ✅ 已完成（迭代 24）
 
 ---
