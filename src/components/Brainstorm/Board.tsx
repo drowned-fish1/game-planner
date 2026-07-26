@@ -201,8 +201,8 @@ export function BrainstormBoard({
       kind: 'brainstorm:connect',
       itemId: end.itemId,
       focusedItemId: end.itemId,
-      message: '杩炴帴浜嗕袱寮犵璐?',
-      status: '姝ｅ湪杩炴帴纾佽创',
+      message: '连接了两张磁贴',
+      status: '正在连接磁贴',
     });
   }, [connections, onActivity]);
 
@@ -211,17 +211,17 @@ export function BrainstormBoard({
 
     setPendingConnection((current) => {
       if (!current) {
-        onPresenceChange?.('鍑嗗杩炴帴纾佽创', itemId);
+        onPresenceChange?.('准备连接磁贴', itemId);
         return { itemId, handle };
       }
 
       if (current.itemId === itemId && current.handle === handle) {
-        onPresenceChange?.('姝ｅ湪缂栬緫鐧芥澘', itemId);
+        onPresenceChange?.('正在编辑白板', itemId);
         return null;
       }
 
       createConnection(current, { itemId, handle });
-      onPresenceChange?.('姝ｅ湪缂栬緫鐧芥澘', itemId);
+      onPresenceChange?.('正在编辑白板', itemId);
       return null;
     });
   }, [createConnection, isDesktop, onPresenceChange]);
@@ -248,7 +248,7 @@ export function BrainstormBoard({
       originY: transformState.positionY,
     };
     setIsMiddlePanning(true);
-    onPresenceChange?.('姝ｅ湪鎷栧姩鐧芥澘', null);
+    onPresenceChange?.('正在拖动白板', null);
   }, [isDesktop, onPresenceChange]);
 
   useEffect(() => {
@@ -271,7 +271,7 @@ export function BrainstormBoard({
       if (!middlePanRef.current?.active) return;
       middlePanRef.current = null;
       setIsMiddlePanning(false);
-      onPresenceChange?.('姝ｅ湪娴忚鐧芥澘', null);
+      onPresenceChange?.('正在浏览白板', null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
