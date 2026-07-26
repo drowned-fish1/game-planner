@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { X, Upload, Save, Image as ImageIcon, Crosshair } from 'lucide-react';
+import { useState } from 'react';
+import { X, Upload, Save, Image as ImageIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { CustomAsset } from '../../utils/storage';
 

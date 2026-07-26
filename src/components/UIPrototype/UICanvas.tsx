@@ -135,7 +135,9 @@ export function UICanvas({
     try {
         const dataUrl = await toPng(captureRef.current, { pixelRatio: 2 });
         const link = document.createElement('a'); link.download = `${currentPage.name}.png`; link.href = dataUrl; link.click();
-    } catch (err) {}
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

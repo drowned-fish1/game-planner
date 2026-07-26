@@ -53,7 +53,7 @@ export function UIComponentWrapper({
     } catch (e) { return false; }
   };
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (_e: React.MouseEvent) => {
     if (isMoving) return;
     const { type, targetId, param } = component.interaction || { type: 'none' };
     if (type === 'none') return; 

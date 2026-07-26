@@ -321,6 +321,8 @@ export class RoomClient {
       throw new Error('Electron collaboration proxy unavailable');
     }
 
+    // 有意为之：executor 内 await IPC 并把 resolve/reject 交给消息回调，重构需联机验证，暂保留
+    // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
       this.connectedResolver = resolve;
       this.connectedRejecter = reject;

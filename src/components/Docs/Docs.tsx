@@ -5,10 +5,10 @@ import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
-import { 
-  Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, Hash, 
-  Download, FilePlus, Sparkles, Wand2, RefreshCcw, Languages, Expand, 
-  Menu, X, Share2 
+import {
+  Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, Hash,
+  FilePlus, Sparkles, Wand2, RefreshCcw, Languages, Expand,
+  Menu, X, Share2
 } from 'lucide-react';
 import { DocItem } from '../../utils/storage';
 import { AIDialog, AIMode } from './AIDialog';

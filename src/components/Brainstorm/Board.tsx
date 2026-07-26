@@ -104,7 +104,7 @@ export function BrainstormBoard({
   const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 768));
-  const [isMiddlePanning, setIsMiddlePanning] = useState(false);
+  const [, setIsMiddlePanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 

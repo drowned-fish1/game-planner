@@ -120,7 +120,6 @@ interface GlobalStore {
 
 // 帮助函数：获取 Electron API
 const getElectronAPI = () => {
-  // @ts-ignore
   return window.electronAPI;
 };
 

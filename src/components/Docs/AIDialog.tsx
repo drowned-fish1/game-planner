@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, RefreshCw, Check, X, Copy, Wand2 } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCw, Check, X, Copy } from 'lucide-react';
 import { requestAI } from '../../utils/aiService';
 
 export type AIMode = 'generate' | 'rewrite' | 'expand' | 'summarize' | 'translate';
