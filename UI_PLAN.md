@@ -73,7 +73,7 @@
 
 ---
 
-## 3. 已完成（迭代 1–24）
+## 3. 已完成（迭代 1–32）
 
 1. 设计系统：`tailwind.config.js` + `src/index.css`（令牌、字体、阴影、滚动条、焦点环、原语）。
 2. 应用外壳 `App.tsx`（侧栏/顶栏/移动导航/保存状态）——仅改表现，协作逻辑原样保留。
@@ -100,12 +100,13 @@
 23. 浅色主题：主题令牌、切换入口与本地偏好持久化。
 24. 质量门禁：pre-commit 执行 TypeScript、ESLint 和单元测试；补齐 `storage` 与 `normalizeRoomServerUrl` 关键路径测试。
 25. 全链路回归（见 `REGRESSION_CHECKLIST.md`）：生产构建下大厅/白板/文档/联机/UI 原型/设置全量验证（桌面+375px、深浅色）；修复 Electron dev 硬编码 5173 端口导致端口被占时加载错误应用的缺陷（改用 `VITE_DEV_SERVER_URL`）。
-26.9. （迭代 31）i18n 基础设施：`src/i18n/`（messages.ts 类型安全字典 zh-CN 全量 + en-US 可部分、LocaleProvider Context + `t(selector)` 取词，缺失翻译运行时回退 zh-CN，无第三方依赖）；设置页新增语言切换（`gp_locale` 持久化，默认 zh-CN）。已迁移文案：App 外壳（侧栏/移动导航/保存状态/命令面板动作/载入态）、ModuleBoundary、ConfirmHost 默认按钮、Settings 外观区。**待迁移**：Dashboard、Board、Docs、Team、UIPrototype 模块内部文案（继续用 `t((m)=>…)` 增量迁移即可）；协作 presence 文案（moduleStatusLabel 等）发往对端，属协议内容暂不抽。双主题 × 桌面/375px 已实测切换与持久化。
-26.8. （迭代 30）发行质量（见 `RELEASE_CHECKLIST.md`）：删除占位 `electron-builder.json5` 隐患；补齐 package.json description/author、版权 2024-2026；`electron:build` 全流程通过并以 CDP 驱动打包产物实测存储/导入导出/主题持久化与重启恢复；Android `assembleDebug` APK 构建并在模拟器安装启动、WebView 渲染实证。版本号未动、未发布。
-26.7. （迭代 29）性能与离线：五大模块 React.lazy 按需拆包（`ModuleBoundary` 统一 loading/错误重试 UI）；主入口 chunk 848KB → 204KB（gzip 65KB），Docs 367KB / Board 173KB 等按模块加载；Inter/Space Grotesk woff2（OFL）本地打包进 `src/assets/fonts`，index.html 移除 Google Fonts，运行时零外网请求（浏览器网络面板实证）。注意：依赖树是 cnpm/npminstall 布局，勿用 `npm install` 加包。
-26.6. （迭代 28）核心测试补充：总计 67 用例。新增 theme（8）、aiService（10，fetch 全打桩不依赖外网）、boardGeometry（框选矩形/碰撞/吸附纯函数 12）；storage 增补 IPC 读写失败、localStorage 读写失败、旧版存档缺字段迁移、导入深拷贝与字段清洗；Board 框选/碰撞/吸附逻辑提取到 `Brainstorm/boardGeometry.ts`（浏览器实测拖动/吸附/框选/批删行为不变）；storage 补上保存路径 IPC 异常与读取路径 localStorage 异常的防护。
-26.5. （迭代 27）ESLint 清零：51 warnings → 0，`lint` 恢复 `--max-warnings 0`；hooks 依赖以 useCallback 正确修复（AIDialog 自动执行加 ref 守卫防重复触发）；any 全部替换为明确类型（storage 新增 BrainstormItem/Connection 等）；toast/confirm 拆分为 store（utils/*.ts）+ 组件（components/Toaster.tsx、ConfirmHost.tsx）解决 Fast Refresh 警告。注意：`import { toast } from '../utils/toast'` 路径不变。
 26. 协作健壮性：修复 connect Promise 在 joined 前 close/error/超时时永久挂起；异常断线自动重连（指数退避+上限+抖动，成功后重置，`getLatestSnapshot` 让房主重启后用最新内容重建房间）；手动退出取消一切定时器与重连；代号(generation)机制防重复连接/重复监听/重复 disconnected。纯逻辑拆到 `utils/roomConnection.ts`（退避/判定/解析 12 用例），`RoomClient` 支持注入 Fake WebSocket/假定时器（9 用例）；`scripts/verify-collab.mjs` 用两个真实客户端对接真实 CollabServer 验证加入/同步/断网/服务重启/恢复/退出，浏览器 UI 亦实测断线重连全流程。
+27. ESLint 清零：51 warnings → 0，`lint` 恢复 `--max-warnings 0`；hooks 依赖以 useCallback 正确修复（AIDialog 自动执行加 ref 守卫防重复触发）；any 全部替换为明确类型（storage 新增 BrainstormItem/Connection 等）；toast/confirm 拆分为 store（utils/*.ts）+ 组件（components/Toaster.tsx、ConfirmHost.tsx）解决 Fast Refresh 警告。注意：`import { toast } from '../utils/toast'` 路径不变。
+28. 核心测试补充：新增 theme、aiService、boardGeometry 和 storage 边界测试；Board 框选/碰撞/吸附逻辑提取到 `Brainstorm/boardGeometry.ts`，浏览器实测行为不变。
+29. 性能与离线：五大模块 React.lazy 按需拆包（`ModuleBoundary` 统一 loading/错误重试 UI）；主入口 chunk 848KB → 204KB；字体本地打包，运行时零外网请求。
+30. 发行质量（见 `RELEASE_CHECKLIST.md`）：完善 metadata；Electron 安装包与 Android APK 构建通过，并验证存储、导入导出、主题持久化与重启恢复。版本号未动、未发布。
+31. i18n 基础设施：类型安全字典、LocaleProvider、缺失翻译回退和语言偏好持久化；已迁移 App 外壳及 Settings，模块内部文案可继续增量迁移。
+32. 存储守卫与备份恢复：Electron 主数据原子写入、滚动/每日/手动/恢复前备份、损坏自动回退与现场保留；浏览器端滚动备份；设置页提供备份列表及恢复入口。补齐严格存档结构校验、恢复写入冻结和 88 项回归测试；真实浏览器验证“备份 → 修改 → 恢复 → 重载”闭环。
 
 ---
 
@@ -128,8 +129,9 @@
 
 ### P3 — 工程化
 - ~~**[协作健壮性（需联机测试）]**~~ ✅ 已完成（迭代 26，真实双客户端 + 浏览器 UI 联机验证）
-- ~~**[i18n]**~~ ✅ 基础设施已完成（迭代 31）；剩余模块文案按 26.9 增量迁移。
+- ~~**[i18n]**~~ ✅ 基础设施已完成（迭代 31）；剩余模块文案继续增量迁移。
 - ~~**[质量门禁]**~~ ✅ 已完成（迭代 24）
+- ~~**[存储守卫与备份恢复]**~~ ✅ 已完成（迭代 32）
 
 ---
 

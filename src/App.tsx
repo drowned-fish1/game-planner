@@ -15,6 +15,7 @@ import { CommandPalette, type CommandAction } from './components/CommandPalette'
 import { ShortcutHelp } from './components/ShortcutHelp';
 import { ModuleBoundary } from './components/ModuleBoundary';
 import {
+  consumeStorageRecoveryNotice,
   loadProjectContent,
   saveProjectContent,
   type BrainstormConnection,
@@ -123,6 +124,28 @@ function App() {
       roomClientRef.current = null;
     };
   }, []);
+
+  // 启动时提示「主数据损坏、已从备份恢复」（浏览器端由 storage.ts 记录，Electron 端问主进程）；
+  // ref 守卫保证只提示一次，语言切换等引起的 t 变化不会重复弹
+  const bootRecoveryNoticeRef = useRef(false);
+  useEffect(() => {
+    if (bootRecoveryNoticeRef.current) return;
+    bootRecoveryNoticeRef.current = true;
+
+    // duration 0 = 常驻，需手动关闭：数据恢复是必须让用户知情的事件
+    const browserNotice = consumeStorageRecoveryNotice();
+    if (browserNotice) {
+      toast.warning(t((m) => m.settings.storageRecovered)(browserNotice), 0);
+    }
+
+    window.electronAPI?.invoke<{ recoveredFrom: string } | null>('storage:get-recovery-info')
+      .then((info) => {
+        if (info?.recoveredFrom) {
+          toast.warning(t((m) => m.settings.storageRecovered)(`已从备份 ${info.recoveredFrom} 恢复`), 0);
+        }
+      })
+      .catch(() => { /* 非 Electron 或通道不可用时静默 */ });
+  }, [t]);
 
   const refreshServiceInfo = async () => {
     const serviceInfo = await getLocalCollaborationServiceInfo();

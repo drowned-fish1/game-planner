@@ -1,11 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2, Moon, Sun, Palette, Languages } from 'lucide-react';
+import { Plus, Trash2, Save, Check, Settings2, Key, Link, MessageSquareQuote, Sparkles, Eye, EyeOff, PlugZap, Loader2, Moon, Sun, Palette, Languages, Archive, RotateCcw } from 'lucide-react';
 import { toast } from '../../utils/toast';
 import { confirmDialog } from '../../utils/confirm';
 import { testAIConnection } from '../../utils/aiService';
 import { getTheme, setTheme, ThemeMode } from '../../utils/theme';
+import { backupNowInBrowser, freezeStorageWrites, getBrowserBackupInfo, restoreBrowserBackup, unfreezeStorageWrites } from '../../utils/storage';
 import { useLocale } from '../../i18n/LocaleContext';
+
+interface BackupEntry {
+  file: string;
+  kind: 'rolling' | 'daily' | 'manual' | 'prerestore';
+  mtimeMs: number;
+  size: number;
+}
 
 export interface AIConfig {
   id: string;
@@ -38,6 +46,93 @@ export function Settings() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [theme, setThemeState] = useState<ThemeMode>(() => getTheme());
   const { locale, setLocale, t } = useLocale();
+
+  // ===== 备份与恢复（Electron 走主进程 storage-guard；浏览器走备份键） =====
+  const isElectron = Boolean(window.electronAPI?.invoke);
+  const [backups, setBackups] = useState<BackupEntry[]>([]);
+  const [browserBackup, setBrowserBackup] = useState(() => getBrowserBackupInfo());
+
+  const refreshBackups = useCallback(async () => {
+    if (!window.electronAPI?.invoke) return;
+    try {
+      setBackups(await window.electronAPI.invoke<BackupEntry[]>('storage:list-backups'));
+    } catch (err) {
+      console.error('list backups failed', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshBackups();
+  }, [refreshBackups]);
+
+  const handleBackupNow = async () => {
+    if (isElectron && window.electronAPI?.invoke) {
+      try {
+        const result = await window.electronAPI.invoke<{ ok: boolean; error?: string }>('storage:snapshot-now');
+        if (result?.ok) {
+          toast.success(t((m) => m.settings.backupDone));
+          await refreshBackups();
+        } else {
+          toast.error(`${t((m) => m.settings.backupFailed)}：${result?.error || ''}`);
+        }
+      } catch (err) {
+        console.error('snapshot backup failed', err);
+        toast.error(t((m) => m.settings.backupFailed));
+      }
+      return;
+    }
+    if (backupNowInBrowser()) {
+      toast.success(t((m) => m.settings.backupDone));
+      setBrowserBackup(getBrowserBackupInfo());
+    } else {
+      toast.error(t((m) => m.settings.backupFailed));
+    }
+  };
+
+  const handleRestore = async (file?: string) => {
+    const ok = await confirmDialog({
+      title: t((m) => m.settings.backupRestoreConfirmTitle),
+      message: t((m) => m.settings.backupRestoreConfirmMessage),
+      confirmText: t((m) => m.settings.backupRestore),
+      danger: true,
+    });
+    if (!ok) return;
+
+    // 先冻结渲染端写入：防止 reload 前挂起的 autosave 把内存旧数据写回、覆盖恢复结果
+    freezeStorageWrites();
+
+    let restored = false;
+    try {
+      if (isElectron && window.electronAPI?.invoke && file) {
+        const result = await window.electronAPI.invoke<{ ok: boolean; error?: string }>('storage:restore-backup', { file });
+        restored = Boolean(result?.ok);
+        if (!restored) toast.error(`${t((m) => m.settings.backupRestoreFailed)}：${result?.error || ''}`);
+      } else {
+        restored = restoreBrowserBackup();
+        if (!restored) toast.error(t((m) => m.settings.backupRestoreFailed));
+      }
+    } catch (err) {
+      console.error('restore backup failed', err);
+      toast.error(t((m) => m.settings.backupRestoreFailed));
+    } finally {
+      if (!restored) unfreezeStorageWrites();
+    }
+
+    if (restored) {
+      toast.success(t((m) => m.settings.backupRestoreDone));
+      // 数据在启动路径整体载入，恢复后重载应用回到干净状态
+      window.setTimeout(() => window.location.reload(), 800);
+    }
+  };
+
+  const backupKindLabel = (kind: BackupEntry['kind']) => {
+    switch (kind) {
+      case 'daily': return t((m) => m.settings.backupKindDaily);
+      case 'manual': return t((m) => m.settings.backupKindManual);
+      case 'prerestore': return t((m) => m.settings.backupKindPrerestore);
+      default: return t((m) => m.settings.backupKindRolling);
+    }
+  };
 
   const switchTheme = (mode: ThemeMode) => {
     setThemeState(mode);
@@ -191,6 +286,57 @@ export function Settings() {
                         </button>
                     </div>
                   </div>
+                </div>
+            </section>
+
+            {/* 备份与恢复板块 */}
+            <section>
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><Archive size={20} className="text-brand-400"/> {t((m) => m.settings.backupTitle)}</h2>
+                <div className="card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="mt-0.5 text-xs text-muted">{t((m) => m.settings.backupDesc)}</div>
+                        <button onClick={handleBackupNow} className="btn-outline shrink-0 text-sm">
+                            <Archive size={15} /> {t((m) => m.settings.backupNow)}
+                        </button>
+                    </div>
+
+                    {isElectron ? (
+                        backups.length === 0 ? (
+                            <div className="mt-4 text-sm text-subtle">{t((m) => m.settings.backupEmpty)}</div>
+                        ) : (
+                            <ul className="mt-4 divide-y divide-line/60">
+                                {backups.map((backup) => (
+                                    <li key={backup.file} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <span className="chip shrink-0">{backupKindLabel(backup.kind)}</span>
+                                            <span className="text-sm text-content">{new Date(backup.mtimeMs).toLocaleString()}</span>
+                                            <span className="text-xs text-subtle">{Math.max(1, Math.round(backup.size / 1024))} KB</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleRestore(backup.file)}
+                                            className="btn-ghost shrink-0 text-sm"
+                                            title={t((m) => m.settings.backupRestore)}
+                                        >
+                                            <RotateCcw size={14} /> {t((m) => m.settings.backupRestore)}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )
+                    ) : (
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                            <span className="text-sm text-muted">
+                                {browserBackup
+                                    ? t((m) => m.settings.backupBrowserAvailable)(Math.max(1, Math.round(browserBackup.size / 1024)))
+                                    : t((m) => m.settings.backupEmpty)}
+                            </span>
+                            {browserBackup && (
+                                <button onClick={() => handleRestore()} className="btn-ghost shrink-0 text-sm">
+                                    <RotateCcw size={14} /> {t((m) => m.settings.backupRestore)}
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </section>
 

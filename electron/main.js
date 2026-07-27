@@ -1,13 +1,28 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const os = require('os');
 const { CollabServer } = require('./collab-server');
 const { MainProcessCollabClientManager } = require('./collab-client');
 const { LanDiscoveryService } = require('./lan-discovery');
+const { StorageGuard } = require('./storage-guard');
+
+// 测试/沙箱可用环境变量覆盖 userData，避免端到端验证碰真实数据
+if (process.env.GP_USER_DATA_DIR) {
+  app.setPath('userData', process.env.GP_USER_DATA_DIR);
+}
+// 端到端测试可通过环境变量开启 CDP 远程调试（生产不设即无效）
+if (process.env.GP_REMOTE_DEBUG_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.GP_REMOTE_DEBUG_PORT);
+  app.commandLine.appendSwitch('remote-allow-origins', '*');
+}
 
 const APP_ROOT = path.join(__dirname, '..');
 const DATA_FILE = path.join(app.getPath('userData'), 'gp_data.json');
+const BACKUP_DIR = path.join(app.getPath('userData'), 'backups');
+
+const storageGuard = new StorageGuard({ dataFile: DATA_FILE, backupDir: BACKUP_DIR });
+// 本次进程内是否发生过「损坏回退」，渲染端启动时查询并提示用户
+let storageRecoveryInfo = null;
 
 let win = null;
 const collabServer = new CollabServer();
@@ -42,11 +57,11 @@ function createWindow() {
 
 ipcMain.on('load-data-sync', (event) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      event.returnValue = fs.readFileSync(DATA_FILE, 'utf-8');
-      return;
+    const { raw, recoveredFrom } = storageGuard.load();
+    if (recoveredFrom) {
+      storageRecoveryInfo = { recoveredFrom, at: Date.now() };
     }
-    event.returnValue = null;
+    event.returnValue = raw;
   } catch (err) {
     console.error('Load Error:', err);
     event.returnValue = null;
@@ -55,12 +70,28 @@ ipcMain.on('load-data-sync', (event) => {
 
 ipcMain.on('save-data-sync', (event, data) => {
   try {
-    fs.writeFileSync(DATA_FILE, data);
-    event.returnValue = true;
+    const result = storageGuard.save(data);
+    if (!result.ok) console.error('Save refused/failed:', result.error);
+    event.returnValue = result.ok;
   } catch (err) {
     console.error('Save Error:', err);
     event.returnValue = false;
   }
+});
+
+// ===== 备份与恢复（渲染端设置页使用） =====
+ipcMain.handle('storage:get-recovery-info', () => {
+  const info = storageRecoveryInfo;
+  storageRecoveryInfo = null;
+  return info;
+});
+
+ipcMain.handle('storage:list-backups', () => storageGuard.listBackups());
+
+ipcMain.handle('storage:snapshot-now', () => storageGuard.snapshotNow());
+
+ipcMain.handle('storage:restore-backup', (_event, payload) => {
+  return storageGuard.restoreBackup(payload && payload.file);
 });
 
 ipcMain.handle('collab:get-service-info', async () => {
@@ -100,6 +131,9 @@ ipcMain.handle('collab:discover-lan-rooms', async () => {
 });
 
 app.whenReady().then(async () => {
+  // 每日备份：主数据完好时每天首启做一份（损坏场景交给 load 的回退流程）
+  storageGuard.makeStartupBackup();
+
   try {
     await collabServer.start();
     await lanDiscovery.start();

@@ -35,6 +35,8 @@ before(async () => {
 beforeEach(() => {
   memory.clear();
   installBrowserStorage();
+  // 迭代 32 引入进程内原始串缓存：每个用例都要从后端重新读
+  storage.resetStorageCacheForTests();
 });
 
 describe('storage browser fallback', () => {
@@ -226,10 +228,11 @@ describe('storage electron IPC', () => {
       };
       assert.equal(storage.getProjectsList()[0].name, 'Electron 项目');
 
-      // IPC 抛错 → 安全默认值
+      // IPC 抛错 → 安全默认值（切换后端需重置缓存，模拟另一次冷启动）
       globalThis.window = {
         electronAPI: { sendSync: () => { throw new Error('ipc dead'); } },
       };
+      storage.resetStorageCacheForTests();
       assert.deepEqual(storage.getProjectsList(), []);
     } finally {
       console.error = originalError;
@@ -254,6 +257,128 @@ describe('storage electron IPC', () => {
     } finally {
       console.error = originalError;
     }
+  });
+});
+
+describe('storage cache & browser backup (迭代 32)', () => {
+  test('raw cache skips repeated backend reads after first load/save', () => {
+    let ipcReads = 0;
+    globalThis.window = {
+      electronAPI: {
+        sendSync: (channel, data) => {
+          if (channel === 'load-data-sync') { ipcReads += 1; return null; }
+          if (channel === 'save-data-sync') { void data; return true; }
+          return null;
+        },
+      },
+    };
+    storage.resetStorageCacheForTests();
+
+    storage.getProjectsList();
+    storage.getProjectsList();
+    assert.equal(ipcReads, 1); // 第二次命中缓存
+
+    storage.saveProjectsList([{ id: 'p', name: 'n', cover: '', lastModified: 1 }]);
+    const after = storage.getProjectsList();
+    assert.equal(after[0].id, 'p');
+    assert.equal(ipcReads, 1); // 保存后仍走缓存，不再回读
+
+    // 每次 load 返回独立对象（无别名）：改返回值不影响下一次读取
+    after.push({ id: 'ghost', name: 'x', cover: '', lastModified: 2 });
+    assert.equal(storage.getProjectsList().length, 1);
+  });
+
+  test('corrupt main key recovers from browser backup key and rewrites it', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      const backup = JSON.stringify({
+        projects: [{ id: 'saved', name: '备份里的项目', cover: '', lastModified: 1 }],
+        contents: {},
+        configs: {},
+      });
+      memory.set(STORE_KEY, '{corrupted!!!');
+      memory.set('gp_all_data_backup', backup);
+
+      const projects = storage.getProjectsList();
+      assert.equal(projects[0].id, 'saved');
+      // 主键被备份内容修复
+      assert.equal(memory.get(STORE_KEY), backup);
+      // 一次性恢复通知可取用，且只能取一次
+      const notice = storage.consumeStorageRecoveryNotice();
+      assert.match(notice, /已从本地备份恢复/);
+      assert.equal(storage.consumeStorageRecoveryNotice(), null);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('corrupt main key without backup keeps evidence and resets safely', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      memory.set(STORE_KEY, '{corrupted!!!');
+      assert.deepEqual(storage.getProjectsList(), []);
+      // 损坏原文保留可人工抢救
+      assert.equal(memory.get('gp_all_data_corrupt'), '{corrupted!!!');
+      assert.match(storage.consumeStorageRecoveryNotice(), /无可用备份/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('JSON with the wrong store shape is treated as corrupt and recovered', () => {
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      const backup = JSON.stringify({ projects: [], contents: {}, configs: {} });
+      memory.set(STORE_KEY, '[]');
+      memory.set('gp_all_data_backup', backup);
+
+      assert.deepEqual(storage.getProjectsList(), []);
+      assert.equal(memory.get(STORE_KEY), backup);
+      assert.match(storage.consumeStorageRecoveryNotice(), /已从本地备份恢复/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('frozen writes are dropped until unfreeze (restore-in-progress guard)', () => {
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      storage.saveProjectsList([{ id: 'keep', name: '恢复后的数据', cover: '', lastModified: 1 }]);
+      storage.freezeStorageWrites();
+      // 冻结期间的写入（如挂起的 autosave）必须被丢弃，不能覆盖磁盘
+      storage.saveProjectsList([{ id: 'stale', name: '旧数据', cover: '', lastModified: 2 }]);
+      assert.equal(readStore().projects[0].id, 'keep');
+
+      storage.unfreezeStorageWrites();
+      storage.saveProjectsList([{ id: 'fresh', name: '解除后可写', cover: '', lastModified: 3 }]);
+      assert.equal(readStore().projects[0].id, 'fresh');
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  test('rolling browser backup lands every N saves; manual backup/restore round-trips', () => {
+    // 手动备份 + 恢复
+    storage.saveProjectsList([{ id: 'p1', name: 'v1', cover: '', lastModified: 1 }]);
+    assert.equal(storage.backupNowInBrowser(), true);
+    assert.ok(storage.getBrowserBackupInfo());
+
+    storage.saveProjectsList([{ id: 'p1', name: 'v2', cover: '', lastModified: 2 }]);
+    assert.equal(storage.getProjectsList()[0].name, 'v2');
+
+    assert.equal(storage.restoreBrowserBackup(), true);
+    assert.equal(storage.getProjectsList()[0].name, 'v1');
+
+    // 滚动备份：20 次保存后自动落一份
+    for (let i = 0; i < 20; i += 1) {
+      storage.saveProjectsList([{ id: 'p1', name: `auto-${i}`, cover: '', lastModified: i }]);
+    }
+    const backup = JSON.parse(memory.get('gp_all_data_backup'));
+    assert.match(backup.projects[0].name, /auto-/);
   });
 });
 

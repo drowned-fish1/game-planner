@@ -19,7 +19,13 @@ const ACCENT: Record<ToastKind, string> = {
 export function Toaster() {
   const [items, setItems] = useState<ToastItem[]>(getToasts());
 
-  useEffect(() => subscribeToasts((next) => setItems([...next])), []);
+  useEffect(() => {
+    const unsubscribe = subscribeToasts((next) => setItems([...next]));
+    // 兜住「渲染之后、订阅之前」窗口内推入的 toast（如 App 启动 effect 的恢复提示，
+    // 其 effect 先于本组件的订阅 effect 执行）
+    setItems([...getToasts()]);
+    return unsubscribe;
+  }, []);
 
   return (
     <div
