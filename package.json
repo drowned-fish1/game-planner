@@ -1,9 +1,9 @@
 {
   "name": "game-planner",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.6.0",
   "description": "Game Planner Pro · 游戏策划工作台：白板、文档、团队待办、UI 原型与局域网协作",
-  "author": "Game Planner Pro Team",
+  "author": "Jiarui Wang",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
